@@ -5,6 +5,14 @@ using UnityEngine.EventSystems;
 
 public class ChangePage : MonoBehaviour, IPointerClickHandler
 {
+    // CAMBIOS POR HACER:
+    /*
+     * Hacer un script exclusivo para las páginas de Login, Register y Profile, pues se tiene que
+     * detectar si hay una sesión iniciada o no
+     *
+     * Evaluar si es bueno: en una misma Imagen que actúe de página que se pongan todos los elementos de Profile,
+     * Login y Register, y que solo se activen si hay una sesión iniciada y demás
+     */
     public GameObject nextPage;
     public GameObject actualPage;
     

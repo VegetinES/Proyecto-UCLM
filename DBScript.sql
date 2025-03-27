@@ -1,4 +1,4 @@
--- Eliminar tablas si existen (en orden inverso a la creación para evitar problemas con las FK)
+-- Eliminar tablas si existen (en orden inverso a la creación para evitar problemas con las claves foráneas)
 DROP TABLE IF EXISTS LEVEL_ATTEMPS;
 DROP TABLE IF EXISTS STADISTICS;
 DROP TABLE IF EXISTS PARENTAL_CONTROL;
