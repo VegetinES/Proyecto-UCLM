@@ -6,15 +6,6 @@ using UnityEngine.SceneManagement;
 
 public class ChangePage : MonoBehaviour, IPointerClickHandler
 {
-    // CAMBIOS POR HACER:
-    /*
-     * Hacer un script exclusivo para las páginas de Login, Register y Profile, pues se tiene que
-     * detectar si hay una sesión iniciada o no
-     *
-     * Evaluar si es bueno: en una misma Imagen que actúe de página que se pongan todos los elementos de Profile,
-     * Login y Register, y que solo se activen si hay una sesión iniciada y demás
-     */
-    
     [Header("Navegación en la misma escena")]
     public GameObject nextPage;
     public GameObject actualPage;
@@ -58,7 +49,7 @@ public class ChangePage : MonoBehaviour, IPointerClickHandler
         }
         else
         {
-            Debug.LogWarning("La página actual es null. Si es intencional, ignora este mensaje.");
+            Debug.LogWarning("La página actual es null (si se hace con esa intención ignora esta advertencia)");
         }
         
         if (nextPage != null)
@@ -67,7 +58,7 @@ public class ChangePage : MonoBehaviour, IPointerClickHandler
         }
         else
         {
-            Debug.LogWarning("La página de destino es null. Si es intencional, ignora este mensaje.");
+            Debug.LogWarning("La página de destino es null (si se hace con esa intención ignora esta advertencia)");
         }
     }
     
@@ -79,14 +70,14 @@ public class ChangePage : MonoBehaviour, IPointerClickHandler
             if (SceneUtility.GetBuildIndexByScenePath("Scenes/" + targetSceneName) != -1 || 
                 SceneUtility.GetBuildIndexByScenePath(targetSceneName) != -1)
             {
-                // La escena existe, procedemos a cargarla
+                // Se carga la escena entonces
                 SceneManager.LoadScene(targetSceneName);
             }
             else
             {
                 Debug.LogWarning($"La escena '{targetSceneName}' no existe o no está incluida en el Build. Verificando si podemos navegar entre páginas en su lugar.");
                 
-                // Si la escena no existe pero tenemos referencias a páginas, intentamos navegar entre ellas
+                // Si la escena no existe hay referencias de páginas intentamos navegar entre ellas
                 if (nextPage != null)
                 {
                     ActivatePage();
