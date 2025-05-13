@@ -57,21 +57,16 @@ public class SessionUIManager : MonoBehaviour
     public void UpdateUI()
     {
         bool isLoggedIn = AuthManager.Instance != null && AuthManager.Instance.IsLoggedIn;
-        
-        // Mostrar/ocultar elementos según estado de sesión
+    
         if (LoggedIn != null) LoggedIn.SetActive(isLoggedIn);
         if (NotLoggedIn != null) NotLoggedIn.SetActive(!isLoggedIn);
-        
+    
         Debug.Log("Estado de sesión: " + (isLoggedIn ? "Con sesión" : "Sin sesión"));
-        
-        // Asegurar que la base de datos está en buen estado
-        if (DataService.Instance != null)
+    
+        // Asegurar que el DataManager está disponible
+        if (DataManager.Instance != null)
         {
-            if (!DataService.Instance.VerifyDatabase())
-            {
-                Debug.LogWarning("Base de datos no válida después de actualizar UI. Forzando inicialización...");
-                DataService.Instance.ForceInitialize();
-            }
+            Debug.Log("SessionUIManager: DataManager está disponible");
         }
     }
     

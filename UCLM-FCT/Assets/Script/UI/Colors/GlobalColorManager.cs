@@ -7,32 +7,23 @@ using UnityEngine.SceneManagement;
 
 public class GlobalColorManager : MonoBehaviour
 {
-    // Singleton para acceso global
     public static GlobalColorManager Instance { get; private set; }
-    
-    // Evento para notificar cambios en la intensidad de color
     public event Action<int> OnColorIntensityChanged;
     
-    // Intensidad de color actual (1-5)
     private int currentColorIntensity = 3;
-    
-    // Control de inicialización
     private bool configLoaded = false;
+    private bool isWaitingForDataManager = false;
     
     [Header("Depuración")]
     [SerializeField] private bool enableDebugLogs = true;
     
     private void Awake()
     {
-        // Configuración del singleton
         if (Instance == null)
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            
-            // Suscribirse al evento de carga de escena
             SceneManager.sceneLoaded += OnSceneLoaded;
-            
             DebugLog("Inicializado con DontDestroyOnLoad");
         }
         else
@@ -44,47 +35,74 @@ public class GlobalColorManager : MonoBehaviour
     
     private void Start()
     {
-        // Cargar la intensidad de color desde la base de datos
+        StartCoroutine(WaitForDataManagerAndLoad());
+    }
+    
+    private IEnumerator WaitForDataManagerAndLoad()
+    {
+        isWaitingForDataManager = true;
+        DebugLog("Esperando a que DataManager esté disponible...");
+        
+        // Esperar hasta que DataManager esté disponible con un límite de tiempo
+        float timeWaited = 0f;
+        float maxWaitTime = 10f;
+        
+        while (DataManager.Instance == null && timeWaited < maxWaitTime)
+        {
+            timeWaited += 0.1f;
+            yield return new WaitForSeconds(0.1f);
+        }
+        
+        if (DataManager.Instance == null)
+        {
+            Debug.LogError("GlobalColorManager: DataManager no disponible después de esperar");
+            isWaitingForDataManager = false;
+            yield break;
+        }
+        
+        DebugLog("DataManager encontrado, esperando un poco más para asegurar inicialización...");
+        yield return new WaitForSeconds(0.5f);
+        
+        isWaitingForDataManager = false;
         LoadColorIntensity();
     }
     
     private void OnDestroy()
     {
-        // Desuscribirse del evento de carga de escena
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
     
-    // Evento cuando se carga una nueva escena
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         DebugLog($"Nueva escena cargada: {scene.name}");
-        
-        // Esperar un frame para asegurarse de que todos los objetos estén inicializados
         StartCoroutine(NotifyColorIntensityNextFrame());
     }
     
     private IEnumerator NotifyColorIntensityNextFrame()
     {
-        yield return null; // Esperar un frame
+        yield return null;
         
-        // Recargar la intensidad de color si no se ha cargado todavía
-        if (!configLoaded)
+        // Asegurarnos de que no estamos aún esperando a DataManager
+        while (isWaitingForDataManager)
+        {
+            yield return new WaitForSeconds(0.1f);
+        }
+        
+        if (!configLoaded && DataManager.Instance != null)
         {
             LoadColorIntensity();
         }
         
-        // Notificar a todos los adaptadores del color actual
         NotifyColorIntensityChanged();
     }
     
-    // Cargar la intensidad de color desde la base de datos
     private void LoadColorIntensity()
     {
         try
         {
-            if (DataService.Instance == null)
+            if (DataManager.Instance == null)
             {
-                DebugLog("DataService no disponible al cargar configuración de colores", true);
+                DebugLog("DataManager no disponible al cargar configuración de colores", true);
                 return;
             }
             
@@ -93,14 +111,11 @@ public class GlobalColorManager : MonoBehaviour
             {
                 int previousIntensity = currentColorIntensity;
                 currentColorIntensity = config.Colors;
-                
-                // Asegurar que está en el rango válido
                 currentColorIntensity = Mathf.Clamp(currentColorIntensity, 1, 5);
                 configLoaded = true;
                 
                 DebugLog($"Intensidad de color cargada: {currentColorIntensity} (anterior: {previousIntensity})");
                 
-                // Notificar el cambio después de cargar solo si cambió
                 if (previousIntensity != currentColorIntensity)
                 {
                     NotifyColorIntensityChanged();
@@ -117,7 +132,6 @@ public class GlobalColorManager : MonoBehaviour
         }
     }
     
-    // Método para notificar a todos los listeners del cambio de intensidad
     private void NotifyColorIntensityChanged()
     {
         int listenersCount = OnColorIntensityChanged != null ? OnColorIntensityChanged.GetInvocationList().Length : 0;
@@ -126,50 +140,54 @@ public class GlobalColorManager : MonoBehaviour
         OnColorIntensityChanged?.Invoke(currentColorIntensity);
     }
     
-    // Método para forzar la recarga de la configuración y notificar
     public void ForceRefresh()
     {
         DebugLog("Forzando actualización de colores...");
-        LoadColorIntensity();
+        if (DataManager.Instance != null)
+        {
+            LoadColorIntensity();
+        }
+        else
+        {
+            StartCoroutine(WaitForDataManagerAndLoad());
+        }
     }
     
-    // Método para actualizar la intensidad de color en la base de datos
     public void UpdateColorIntensity(int intensity)
     {
         try
         {
-            if (DataService.Instance == null)
+            if (DataManager.Instance == null)
             {
-                DebugLog("DataService no disponible al actualizar intensidad de color", true);
+                DebugLog("DataManager no disponible al actualizar intensidad de color", true);
                 return;
             }
-            
-            string userId = DataService.Instance.GetCurrentUserId();
-            
-            // Primero asegurarse de que la intensidad es válida
+        
+            string userId = DataManager.Instance.GetCurrentUserId();
             intensity = Mathf.Clamp(intensity, 1, 5);
-            
-            // Si la intensidad no cambió, no hacer nada
+        
             if (currentColorIntensity == intensity)
             {
                 DebugLog($"La intensidad ya es {intensity}, no se realizan cambios");
                 return;
             }
-            
+        
             DebugLog($"<color=yellow>Actualizando intensidad de color de {currentColorIntensity} a {intensity}</color>");
-            
-            // Actualizar el valor local
+        
             currentColorIntensity = intensity;
-            
-            // Actualizar en la base de datos
-            DataService.Instance.ConfigRepo.UpdateColors(userId, intensity);
-            
+        
+            var config = SqliteDatabase.Instance.GetConfiguration(userId);
+            if (config != null)
+            {
+                SqliteDatabase.Instance.SaveConfiguration(userId, intensity, config.AutoNarrator, config.Sound, config.GeneralSound, config.MusicSound, config.EffectsSound, config.NarratorSound, config.Vibration);
+            }
+            else
+            {
+                SqliteDatabase.Instance.SaveConfiguration(userId, intensity, false);
+            }
+        
             DebugLog($"Intensidad de color actualizada a {intensity} para usuario {userId}");
-            
-            // Notificar el cambio
             NotifyColorIntensityChanged();
-            
-            // Marcar la configuración como cargada
             configLoaded = true;
         }
         catch (System.Exception e)
@@ -178,7 +196,6 @@ public class GlobalColorManager : MonoBehaviour
         }
     }
     
-    // Método público para obtener la intensidad actual
     public int GetCurrentIntensity()
     {
         return currentColorIntensity;

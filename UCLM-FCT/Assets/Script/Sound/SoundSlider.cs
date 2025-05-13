@@ -182,46 +182,27 @@ public class SoundSlider : MonoBehaviour
     {
         try
         {
-            if (DataService.Instance == null)
-            {
-                Debug.LogError("SoundSlider: DataService no disponible para actualización directa");
-                return;
-            }
-            
-            string userId = DataService.Instance.GetCurrentUserId();
-            var config = DataService.Instance.ConfigRepo.GetUserConfiguration(userId);
-            
+            string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+            var config = SqliteDatabase.Instance.GetConfiguration(userId);
+        
             if (config != null)
             {
-                // Obtener valores actuales
-                bool sound = config.Sound;
-                int generalSound = config.GeneralSound;
-                int musicSound = config.MusicSound;
-                int effectsSound = config.EffectsSound;
-                int narratorSound = config.NarratorSound;
-                bool vibration = config.Vibration;
-                
-                // Actualizar valor específico
                 switch (sliderType)
                 {
                     case SoundSliderType.General:
-                        generalSound = value;
+                        SqliteDatabase.Instance.SaveConfiguration(userId, config.Colors, config.AutoNarrator, config.Sound, value, config.MusicSound, config.EffectsSound, config.NarratorSound, config.Vibration);
                         break;
                     case SoundSliderType.Music:
-                        musicSound = value;
+                        SqliteDatabase.Instance.SaveConfiguration(userId, config.Colors, config.AutoNarrator, config.Sound, config.GeneralSound, value, config.EffectsSound, config.NarratorSound, config.Vibration);
                         break;
                     case SoundSliderType.Effects:
-                        effectsSound = value;
+                        SqliteDatabase.Instance.SaveConfiguration(userId, config.Colors, config.AutoNarrator, config.Sound, config.GeneralSound, config.MusicSound, value, config.NarratorSound, config.Vibration);
                         break;
                     case SoundSliderType.Narrator:
-                        narratorSound = value;
+                        SqliteDatabase.Instance.SaveConfiguration(userId, config.Colors, config.AutoNarrator, config.Sound, config.GeneralSound, config.MusicSound, config.EffectsSound, value, config.Vibration);
                         break;
                 }
-                
-                // Actualizar configuración
-                DataService.Instance.ConfigRepo.UpdateSoundSettings(
-                    userId, sound, generalSound, musicSound, effectsSound, narratorSound, vibration);
-                
+            
                 Debug.Log($"SoundSlider: Valor {sliderType} actualizado directamente en la base de datos a {value}");
             }
         }

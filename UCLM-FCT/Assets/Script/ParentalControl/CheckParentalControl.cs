@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
-using Realms;
 
 public enum ParentalSection
 {
@@ -54,99 +53,71 @@ public class CheckParentalControl : MonoBehaviour, IPointerClickHandler
         }
     }
     
-    private bool IsParentalControlActive()
+    // Reemplazar método IsParentalControlActive completo:
+private bool IsParentalControlActive()
+{
+    try
     {
-        try
+        string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+        bool isActive = false;
+        
+        var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+        
+        if (parentalControl != null && parentalControl.Activated && !string.IsNullOrEmpty(parentalControl.Pin))
         {
-            // Obtener ID del usuario actual
-            string userId = DataService.Instance.GetCurrentUserId();
-            bool isActive = false;
-            
-            using (var realm = Realm.GetInstance(new RealmConfiguration { SchemaVersion = 1 }))
+            switch (section)
             {
-                // Primero verificamos si el control parental está configurado (tiene un PIN)
-                bool parentalControlConfigured = false;
-                
-                // Verificar usuario actual
-                var user = realm.Find<User>(userId);
-                if (user != null && user.ParentalControl != null)
+                case ParentalSection.Sound:
+                    isActive = parentalControl.SoundConf;
+                    break;
+                case ParentalSection.Accessibility:
+                    isActive = parentalControl.AccessibilityConf;
+                    break;
+                case ParentalSection.Statistics:
+                    isActive = parentalControl.StatisticsConf;
+                    break;
+                case ParentalSection.About:
+                    isActive = parentalControl.AboutConf;
+                    break;
+                case ParentalSection.Profile:
+                    isActive = parentalControl.ProfileConf;
+                    break;
+            }
+        }
+        else if (userId != AuthManager.DEFAULT_USER_ID)
+        {
+            var defaultParental = SqliteDatabase.Instance.GetParentalControl(AuthManager.DEFAULT_USER_ID);
+            if (defaultParental != null && defaultParental.Activated && !string.IsNullOrEmpty(defaultParental.Pin))
+            {
+                switch (section)
                 {
-                    // Un control parental está configurado si tiene un PIN y está activado
-                    if (user.ParentalControl.Activated && !string.IsNullOrEmpty(user.ParentalControl.Pin))
-                    {
-                        parentalControlConfigured = true;
-                        
-                        // Verificar la sección específica
-                        switch (section)
-                        {
-                            case ParentalSection.Sound:
-                                isActive = user.ParentalControl.SoundConf;
-                                break;
-                            case ParentalSection.Accessibility:
-                                isActive = user.ParentalControl.AccessibilityConf;
-                                break;
-                            case ParentalSection.Statistics:
-                                isActive = user.ParentalControl.StatisticsConf;
-                                break;
-                            case ParentalSection.About:
-                                isActive = user.ParentalControl.AboutConf;
-                                break;
-                            case ParentalSection.Profile:
-                                isActive = user.ParentalControl.ProfileConf;
-                                break;
-                        }
-                    }
-                }
-                
-                // Verificar usuario por defecto si es necesario
-                if (!parentalControlConfigured && userId != AuthManager.DEFAULT_USER_ID)
-                {
-                    var defaultUser = realm.Find<User>(AuthManager.DEFAULT_USER_ID);
-                    if (defaultUser != null && defaultUser.ParentalControl != null)
-                    {
-                        // Verificar que tiene PIN y está activado
-                        if (defaultUser.ParentalControl.Activated && !string.IsNullOrEmpty(defaultUser.ParentalControl.Pin))
-                        {
-                            parentalControlConfigured = true;
-                            
-                            // Verificar la sección específica para el usuario por defecto
-                            switch (section)
-                            {
-                                case ParentalSection.Sound:
-                                    isActive = defaultUser.ParentalControl.SoundConf;
-                                    break;
-                                case ParentalSection.Accessibility:
-                                    isActive = defaultUser.ParentalControl.AccessibilityConf;
-                                    break;
-                                case ParentalSection.Statistics:
-                                    isActive = defaultUser.ParentalControl.StatisticsConf;
-                                    break;
-                                case ParentalSection.About:
-                                    isActive = defaultUser.ParentalControl.AboutConf;
-                                    break;
-                                case ParentalSection.Profile:
-                                    isActive = defaultUser.ParentalControl.ProfileConf;
-                                    break;
-                            }
-                        }
-                    }
-                }
-                
-                // Si el control parental no está configurado, simplemente devolver false
-                if (!parentalControlConfigured)
-                {
-                    return false;
+                    case ParentalSection.Sound:
+                        isActive = defaultParental.SoundConf;
+                        break;
+                    case ParentalSection.Accessibility:
+                        isActive = defaultParental.AccessibilityConf;
+                        break;
+                    case ParentalSection.Statistics:
+                        isActive = defaultParental.StatisticsConf;
+                        break;
+                    case ParentalSection.About:
+                        isActive = defaultParental.AboutConf;
+                        break;
+                    case ParentalSection.Profile:
+                        isActive = defaultParental.ProfileConf;
+                        break;
                 }
             }
-            
-            return isActive;
         }
-        catch (System.Exception e)
-        {
-            Debug.LogError("Error al verificar control parental: " + e.Message);
-            return false;
-        }
+        
+        return isActive;
     }
+    catch (System.Exception e)
+    {
+        Debug.LogError("Error al verificar control parental: " + e.Message);
+        return false;
+    }
+}
     
     public void Navigate()
     {

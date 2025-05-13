@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using TMPro;
-using Realms;
 
 public class CheckPin : MonoBehaviour, IPointerClickHandler
 {
@@ -63,47 +62,36 @@ public class CheckPin : MonoBehaviour, IPointerClickHandler
     {
         try
         {
-            // Obtener ID del usuario actual
-            string userId = DataService.Instance.GetCurrentUserId();
+            string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
             string storedHash = "";
             bool pinFound = false;
-            
-            // Obtener el hash del PIN directamente de la base de datos
-            using (var realm = Realm.GetInstance(new RealmConfiguration { SchemaVersion = 1 }))
+        
+            var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+            if (parentalControl != null && !string.IsNullOrEmpty(parentalControl.Pin))
             {
-                // Primero intentamos con el usuario actual
-                var parentalControl = realm.Find<ParentalControl>(userId);
-                if (parentalControl != null && !string.IsNullOrEmpty(parentalControl.Pin))
+                storedHash = parentalControl.Pin;
+                pinFound = true;
+                Debug.Log("PIN encontrado para el usuario actual");
+            }
+        
+            if (!pinFound && userId != AuthManager.DEFAULT_USER_ID)
+            {
+                var defaultParental = SqliteDatabase.Instance.GetParentalControl(AuthManager.DEFAULT_USER_ID);
+                if (defaultParental != null && !string.IsNullOrEmpty(defaultParental.Pin))
                 {
-                    storedHash = parentalControl.Pin;
+                    storedHash = defaultParental.Pin;
                     pinFound = true;
-                    Debug.Log("PIN encontrado para el usuario actual");
-                }
-                
-                // Si no encontramos un PIN para el usuario actual, intentamos con el usuario por defecto
-                if (!pinFound && userId != AuthManager.DEFAULT_USER_ID)
-                {
-                    var defaultParentalControl = realm.Find<ParentalControl>(AuthManager.DEFAULT_USER_ID);
-                    if (defaultParentalControl != null && !string.IsNullOrEmpty(defaultParentalControl.Pin))
-                    {
-                        storedHash = defaultParentalControl.Pin;
-                        pinFound = true;
-                        Debug.Log("PIN encontrado para el usuario por defecto");
-                    }
-                }
-                
-                if (!pinFound)
-                {
-                    Debug.Log("No se encontró ningún PIN configurado. Redirigiendo sin verificación.");
-                    // Si no hay ningún PIN configurado, permitimos el acceso sin verificación
-                    return true;
+                    Debug.Log("PIN encontrado para el usuario por defecto");
                 }
             }
-            
-            // Calcular el hash del PIN introducido
+        
+            if (!pinFound)
+            {
+                Debug.Log("No se encontró ningún PIN configurado. Redirigiendo sin verificación.");
+                return true;
+            }
+        
             string inputHash = GetSHA256Hash(inputPin);
-            
-            // Comparar los hashes
             return storedHash.Equals(inputHash);
         }
         catch (System.Exception e)

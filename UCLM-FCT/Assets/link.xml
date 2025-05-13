@@ -1,0 +1,4 @@
+<linker>
+  <assembly fullname="ZstdSharp" preserve="all"/>
+  <assembly fullname="System.Core" preserve="all"/>
+</linker>

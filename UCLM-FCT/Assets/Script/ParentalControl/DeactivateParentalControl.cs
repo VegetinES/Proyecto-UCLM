@@ -65,44 +65,40 @@ public class DeactivateParentalControl : MonoBehaviour, IPointerClickHandler
         try
         {
             // Obtener ID del usuario actual
-            string userId = DataService.Instance.GetCurrentUserId();
+            string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
             string storedHash = "";
             bool pinFound = false;
-            
-            // Obtener el hash del PIN directamente de la base de datos
-            using (var realm = Realms.Realm.GetInstance(new Realms.RealmConfiguration { SchemaVersion = 1 }))
+        
+            // Obtener el hash del PIN desde SQLite
+            var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+            if (parentalControl != null && !string.IsNullOrEmpty(parentalControl.Pin))
             {
-                // Primero intentamos con el usuario actual
-                var parentalControl = realm.Find<ParentalControl>(userId);
-                if (parentalControl != null && !string.IsNullOrEmpty(parentalControl.Pin))
+                storedHash = parentalControl.Pin;
+                pinFound = true;
+                Debug.Log("PIN encontrado para el usuario actual");
+            }
+        
+            // Si no encontramos un PIN para el usuario actual, intentamos con el usuario por defecto
+            if (!pinFound && userId != AuthManager.DEFAULT_USER_ID)
+            {
+                var defaultParentalControl = SqliteDatabase.Instance.GetParentalControl(AuthManager.DEFAULT_USER_ID);
+                if (defaultParentalControl != null && !string.IsNullOrEmpty(defaultParentalControl.Pin))
                 {
-                    storedHash = parentalControl.Pin;
+                    storedHash = defaultParentalControl.Pin;
                     pinFound = true;
-                    Debug.Log("PIN encontrado para el usuario actual");
-                }
-                
-                // Si no encontramos un PIN para el usuario actual, intentamos con el usuario por defecto
-                if (!pinFound && userId != AuthManager.DEFAULT_USER_ID)
-                {
-                    var defaultParentalControl = realm.Find<ParentalControl>(AuthManager.DEFAULT_USER_ID);
-                    if (defaultParentalControl != null && !string.IsNullOrEmpty(defaultParentalControl.Pin))
-                    {
-                        storedHash = defaultParentalControl.Pin;
-                        pinFound = true;
-                        Debug.Log("PIN encontrado para el usuario por defecto");
-                    }
-                }
-                
-                if (!pinFound)
-                {
-                    Debug.Log("No se encontró ningún PIN configurado.");
-                    return false;
+                    Debug.Log("PIN encontrado para el usuario por defecto");
                 }
             }
-            
+        
+            if (!pinFound)
+            {
+                Debug.Log("No se encontró ningún PIN configurado.");
+                return false;
+            }
+        
             // Calcular el hash del PIN introducido
             string inputHash = GetSHA256Hash(inputPin);
-            
+        
             // Comparar los hashes
             return storedHash.Equals(inputHash);
         }
@@ -117,32 +113,23 @@ public class DeactivateParentalControl : MonoBehaviour, IPointerClickHandler
     {
         try
         {
-            string userId = DataService.Instance.GetCurrentUserId();
-            
-            // Obtener el control parental actual para preservar la configuración existente
-            var parentalControl = DataAccess.GetParentalControl();
-            
+            string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+        
+            var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+        
             if (parentalControl != null)
             {
-                bool soundConf = parentalControl.SoundConf;
-                bool accessibilityConf = parentalControl.AccessibilityConf;
-                bool statisticsConf = parentalControl.StatisticsConf;
-                bool aboutConf = parentalControl.AboutConf;
-                bool profileConf = parentalControl.ProfileConf;
-                string pin = parentalControl.Pin; // Mantener el mismo PIN
-                
-                // Actualizar el control parental para desactivarlo, pero manteniendo la configuración
-                DataService.Instance.ParentalRepo.UpdateSettings(
+                SqliteDatabase.Instance.SaveParentalControl(
                     userId,
-                    false, // Desactivamos el control parental
-                    pin,   // Mantenemos el mismo PIN por si se quiere reactivar después
-                    soundConf,
-                    accessibilityConf,
-                    statisticsConf,
-                    aboutConf,
-                    profileConf
+                    false,
+                    parentalControl.Pin,
+                    parentalControl.SoundConf,
+                    parentalControl.AccessibilityConf,
+                    parentalControl.StatisticsConf,
+                    parentalControl.AboutConf,
+                    parentalControl.ProfileConf
                 );
-                
+            
                 Debug.Log("Control parental desactivado correctamente");
             }
             else

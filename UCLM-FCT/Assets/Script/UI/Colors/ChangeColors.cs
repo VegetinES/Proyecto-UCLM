@@ -34,34 +34,31 @@ public class ChangeColors : MonoBehaviour
     {
         int colorValue = (int)value;
     
-        // Actualizar colores
         UpdateColors(colorValue);
     
-        // Guardar en la base de datos
         try
         {
             Debug.Log($"ChangeColors: Actualizando color a {colorValue}");
-            
-            // Si GlobalColorManager está disponible, usar su método
-            if (GlobalColorManager.Instance != null)
+        
+            var userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+            var config = SqliteDatabase.Instance.GetConfiguration(userId);
+        
+            if (config != null)
             {
-                GlobalColorManager.Instance.UpdateColorIntensity(colorValue);
-                Debug.Log("ChangeColors: Color actualizado a través de GlobalColorManager");
+                SqliteDatabase.Instance.SaveConfiguration(userId, colorValue, config.AutoNarrator, config.Sound, config.GeneralSound, config.MusicSound, config.EffectsSound, config.NarratorSound, config.Vibration);
             }
             else
             {
-                // Usar el método directo si el manager no está disponible
-                var userId = DataService.Instance.GetCurrentUserId();
-                DataService.Instance.ConfigRepo.UpdateColors(userId, colorValue);
-                Debug.Log($"ChangeColors: Color actualizado directamente en la base de datos para {userId}");
+                SqliteDatabase.Instance.SaveConfiguration(userId, colorValue, false);
             }
-            
-            // Busca el inicializador de colores y fuerza la actualización
-            ColorAdapterInitializer initializer = FindObjectOfType<ColorAdapterInitializer>();
-            if (initializer != null)
+        
+            // Actualizar GlobalColorManager si está disponible
+            if (GlobalColorManager.Instance != null)
             {
-                initializer.ForceInitialization();
+                GlobalColorManager.Instance.UpdateColorIntensity(colorValue);
             }
+        
+            Debug.Log($"ChangeColors: Color actualizado en la base de datos para {userId}");
         }
         catch (System.Exception e)
         {

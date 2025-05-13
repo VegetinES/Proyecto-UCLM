@@ -23,7 +23,6 @@ public class GlobalSoundManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            
             SceneManager.sceneLoaded += OnSceneLoaded;
             Debug.Log("GlobalSoundManager: Inicializado como singleton");
         }
@@ -35,6 +34,16 @@ public class GlobalSoundManager : MonoBehaviour
     
     private void Start()
     {
+        StartCoroutine(WaitForDataManagerAndLoad());
+    }
+    
+    private IEnumerator WaitForDataManagerAndLoad()
+    {
+        while (DataManager.Instance == null)
+        {
+            yield return new WaitForSeconds(0.1f);
+        }
+        yield return new WaitForSeconds(0.1f);
         LoadConfiguration();
     }
     
@@ -52,9 +61,8 @@ public class GlobalSoundManager : MonoBehaviour
     private IEnumerator ApplySoundConfigNextFrame()
     {
         yield return null;
-        yield return null; // Esperar dos frames para asegurar que los toggles y sliders estén inicializados
+        yield return null;
         
-        // Recargar la configuración si es necesario
         if (!configLoaded)
         {
             LoadConfiguration();
@@ -68,9 +76,9 @@ public class GlobalSoundManager : MonoBehaviour
     {
         try
         {
-            if (DataService.Instance == null)
+            if (DataManager.Instance == null)
             {
-                Debug.LogWarning("GlobalSoundManager: DataService no disponible al cargar configuración");
+                Debug.LogWarning("GlobalSoundManager: DataManager no disponible al cargar configuración");
                 return;
             }
             
@@ -176,10 +184,13 @@ public class GlobalSoundManager : MonoBehaviour
     {
         soundEnabled = isEnabled;
         SaveConfiguration();
-        
+    
         // Actualizar la interactividad de los sliders inmediatamente
         UpdateSliderInteractability();
-        
+    
+        // Notificar cambios a los controladores de música
+        NotifyVolumeChanges();
+    
         Debug.Log($"GlobalSoundManager: Sound actualizado a {isEnabled}");
     }
     
@@ -203,7 +214,10 @@ public class GlobalSoundManager : MonoBehaviour
     {
         generalSoundLevel = level;
         SaveConfiguration();
-        
+    
+        // Notificar cambios a los controladores de música
+        NotifyVolumeChanges();
+    
         Debug.Log($"GlobalSoundManager: GeneralSound actualizado a {level}");
     }
     
@@ -211,7 +225,10 @@ public class GlobalSoundManager : MonoBehaviour
     {
         musicSoundLevel = level;
         SaveConfiguration();
-        
+    
+        // Notificar cambios a los controladores de música
+        NotifyVolumeChanges();
+    
         Debug.Log($"GlobalSoundManager: MusicSound actualizado a {level}");
     }
     
@@ -235,19 +252,18 @@ public class GlobalSoundManager : MonoBehaviour
     {
         try
         {
-            if (DataService.Instance == null)
+            if (DataManager.Instance == null)
             {
-                Debug.LogError("GlobalSoundManager: DataService no disponible al guardar configuración");
+                Debug.LogError("GlobalSoundManager: DataManager no disponible al guardar configuración");
                 return;
             }
-            
-            var userId = DataService.Instance.GetCurrentUserId();
-            
-            // Obtener la configuración actual para preservar el valor de Colors
-            var currentConfig = DataService.Instance.ConfigRepo.GetUserConfiguration(userId);
+    
+            var userId = DataManager.Instance.GetCurrentUserId();
+    
+            var currentConfig = SqliteDatabase.Instance.GetConfiguration(userId);
             int colorsValue = currentConfig != null ? currentConfig.Colors : 3;
-        
-            DataService.Instance.ConfigRepo.UpdateFullConfiguration(
+
+            SqliteDatabase.Instance.SaveConfiguration(
                 userId,
                 colorsValue,
                 autoNarrator,
@@ -258,10 +274,9 @@ public class GlobalSoundManager : MonoBehaviour
                 narratorSoundLevel,
                 vibrationEnabled
             );
-            
+    
             Debug.Log($"GlobalSoundManager: Configuración guardada para usuario {userId}");
-            
-            // Marcar la configuración como cargada
+            PlayerPrefs.Save(); // Asegura que los datos se guarden inmediatamente
             configLoaded = true;
         }
         catch (System.Exception e)
@@ -275,6 +290,16 @@ public class GlobalSoundManager : MonoBehaviour
         Debug.Log("GlobalSoundManager: Forzando actualización de configuración de sonido");
         LoadConfiguration();
         ApplySoundConfigToCurrentScene();
+    }
+    
+    public void NotifyVolumeChanges()
+    {
+        // Buscar todos los controladores de música en la escena y actualizar su volumen
+        GameMusicController[] musicControllers = FindObjectsOfType<GameMusicController>();
+        foreach (var controller in musicControllers)
+        {
+            controller.UpdateVolume();
+        }
     }
     
     // Métodos para obtener valores actuales para componentes recién creados

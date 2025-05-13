@@ -46,22 +46,17 @@ public class ActivateParentalControl : MonoBehaviour, IPointerClickHandler
     private void SavePinHash(string pin)
     {
         string pinHash = GetSHA256Hash(pin);
-        
-        string userId = DataService.Instance.GetCurrentUserId();
-
-        var parentalControl = DataAccess.GetParentalControl();
     
-        DataService.Instance.ParentalRepo.UpdateSettings(
+        string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+
+        var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+
+        SqliteDatabase.Instance.SaveParentalControl(
             userId,
-            true, // Se activa el control parental
-            pinHash, // PIN hasheado
-            true, // Configuración por defecto
             true,
-            true,
-            true,
-            true
+            pinHash
         );
-        
+    
         Debug.Log("Control parental creado con PIN hasheado");
     }
     

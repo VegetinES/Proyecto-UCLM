@@ -124,59 +124,59 @@ public class SoundToggle : MonoBehaviour, IPointerClickHandler
         }
     }
     
+    // Reemplazar método TryDirectUpdate:
     private void TryDirectUpdate()
     {
         try
         {
-            if (DataService.Instance == null)
-            {
-                Debug.LogError("SoundToggle: DataService no disponible para actualización directa");
-                return;
-            }
-            
-            string userId = DataService.Instance.GetCurrentUserId();
-            var config = DataService.Instance.ConfigRepo.GetUserConfiguration(userId);
-            
+            string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+            var config = SqliteDatabase.Instance.GetConfiguration(userId);
+
             if (config != null)
             {
-                // Obtener valores actuales
-                bool sound = config.Sound;
-                bool autoNarrator = config.AutoNarrator;
-                bool vibration = config.Vibration;
-                
-                // Actualizar valor específico
                 switch (toggleType)
                 {
                     case SoundToggleType.Sound:
-                        sound = isOn;
+                        SqliteDatabase.Instance.SaveConfiguration(userId, config.Colors, config.AutoNarrator, isOn,
+                            config.GeneralSound, config.MusicSound, config.EffectsSound, config.NarratorSound,
+                            config.Vibration);
                         break;
                     case SoundToggleType.Vibration:
-                        vibration = isOn;
+                        SqliteDatabase.Instance.SaveConfiguration(userId, config.Colors, config.AutoNarrator,
+                            config.Sound, config.GeneralSound, config.MusicSound, config.EffectsSound,
+                            config.NarratorSound, isOn);
                         break;
                     case SoundToggleType.AutoNarrator:
-                        autoNarrator = isOn;
+                        SqliteDatabase.Instance.SaveConfiguration(userId, config.Colors, isOn, config.Sound,
+                            config.GeneralSound, config.MusicSound, config.EffectsSound, config.NarratorSound,
+                            config.Vibration);
                         break;
                 }
-                
-                // Actualizar configuración
-                if (toggleType == SoundToggleType.Sound || toggleType == SoundToggleType.Vibration)
+            }
+            else
+            {
+                switch (toggleType)
                 {
-                    DataService.Instance.ConfigRepo.UpdateSoundSettings(
-                        userId, sound, config.GeneralSound, config.MusicSound, 
-                        config.EffectsSound, config.NarratorSound, vibration);
-                }
-                else if (toggleType == SoundToggleType.AutoNarrator)
-                {
-                    DataService.Instance.ConfigRepo.UpdateAutoNarrator(userId, autoNarrator);
+                    case SoundToggleType.Sound:
+                        SqliteDatabase.Instance.SaveConfiguration(userId, 3, false, isOn);
+                        break;
+                    case SoundToggleType.Vibration:
+                        SqliteDatabase.Instance.SaveConfiguration(userId, 3, false, true, 50, 50, 50, 50, isOn);
+                        break;
+                    case SoundToggleType.AutoNarrator:
+                        SqliteDatabase.Instance.SaveConfiguration(userId, 3, isOn);
+                        break;
                 }
             }
+
+            Debug.Log($"SoundToggle: Estado {toggleType} actualizado directamente en la base de datos a {isOn}");
         }
         catch (System.Exception e)
         {
             Debug.LogError($"SoundToggle: Error al actualizar directamente en la base de datos: {e.Message}");
         }
     }
-    
+
     private void UpdateSliderValue()
     {
         if (slider != null)

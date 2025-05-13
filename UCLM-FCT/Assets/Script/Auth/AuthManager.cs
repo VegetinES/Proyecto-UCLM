@@ -4,14 +4,13 @@ using UnityEngine;
 using Supabase;
 using Supabase.Gotrue;
 using TMPro;
-using Realms;
 using Client = Supabase.Client;
 
 public class AuthManager : MonoBehaviour
 {
     // Configuración de Supabase
     public const string SUPABASE_URL = "https://ujbqtvsbrwcgnxveufto.supabase.co";
-    public const string SUPABASE_PUBLIC_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqYnF0dnNicndjZ254dmV1ZnRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM0MTUxMjUsImV4cCI6MjA1ODk5MTEyNX0.Cb5rLYkElmNtxNeNqMDOzXccDIEcyaNUYYqQdpuSsG8";
+    public const string SUPABASE_PUBLIC_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqYnF0dnNicndjZ254dmV1ZnRvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NjIwNDczNywiZXhwIjoyMDYxNzgwNzM3fQ.b_ZZpJzDM9W9itDqxOlm4cRd78m9Dlai1rnM2HbjyBA";
     
     // Claves para PlayerPrefs
     private const string ACCESS_TOKEN_KEY = "supabase_access_token";
@@ -106,7 +105,7 @@ public class AuthManager : MonoBehaviour
                     _isLoggedIn = true;
                     _userID = user.Id;
                     _userEmail = user.Email ?? "";
-                    SaveUserToRealm();
+                    SaveUserToSqlite();
                     UpdateUIForLoggedInUser();
                     Debug.Log($"AuthManager: Sesión restaurada para usuario {_userEmail}");
                     return;
@@ -123,7 +122,7 @@ public class AuthManager : MonoBehaviour
                 
                 // Guardar tokens
                 SaveSessionTokens(session);
-                SaveUserToRealm();
+                SaveUserToSqlite();
                 UpdateUIForLoggedInUser();
                 Debug.Log($"AuthManager: Sesión recuperada de caché para usuario {_userEmail}");
             }
@@ -140,53 +139,17 @@ public class AuthManager : MonoBehaviour
         }
     }
     
-    // Guarda o actualiza el usuario en Realm
-    private void SaveUserToRealm()
+    // Guarda o actualiza el usuario en SQLite
+    private void SaveUserToSqlite()
     {
         try
         {
-            if (DataService.Instance == null)
-            {
-                Debug.LogError("AuthManager: DataService no disponible al intentar guardar usuario");
-                return;
-            }
-            
-            // Comprobar si el usuario existe, si no, crearlo
-            var existingUser = DataService.Instance.UserRepo.GetById(_userID);
-        
-            if (existingUser == null)
-            {
-                // Crear un nuevo usuario
-                var newUser = new User
-                {
-                    UID = _userID,
-                    Email = _userEmail,
-                    CreationDate = DateTimeOffset.Now,
-                    LastLogin = DateTimeOffset.Now
-                };
-            
-                DataService.Instance.UserRepo.Add(newUser);
-            
-                // Crear configuración y control parental por defecto
-                DataService.Instance.EnsureUserExists(_userID);
-                Debug.Log($"AuthManager: Usuario nuevo creado en Realm: {_userID}");
-            }
-            else
-            {
-                // Actualizar el email si es necesario
-                DataService.Instance.UserRepo.Update(existingUser, user => {
-                    user.Email = _userEmail;
-                    user.LastLogin = DateTimeOffset.Now;
-                });
-            
-                // Registrar el login
-                DataService.Instance.UserRepo.RegisterLogin(_userID);
-                Debug.Log($"AuthManager: Usuario existente actualizado en Realm: {_userID}");
-            }
+            SqliteDatabase.Instance.SaveUser(_userID, _userEmail, false);
+            Debug.Log($"AuthManager: Usuario guardado en SQLite: {_userID}");
         }
         catch (Exception e)
         {
-            Debug.LogError($"Error al guardar usuario en Realm: {e.Message}");
+            Debug.LogError($"Error al guardar usuario en SQLite: {e.Message}");
         }
     }
     
@@ -210,13 +173,7 @@ public class AuthManager : MonoBehaviour
     {
         try
         {
-            if (DataService.Instance == null)
-            {
-                Debug.LogError("AuthManager: DataService no disponible al intentar crear usuario por defecto");
-                return;
-            }
-            
-            DataService.Instance.EnsureUserExists(DEFAULT_USER_ID);
+            SqliteDatabase.Instance.SaveUser(DEFAULT_USER_ID, "", false);
             Debug.Log("AuthManager: Usuario por defecto verificado/creado correctamente");
         }
         catch (Exception e)
@@ -224,6 +181,7 @@ public class AuthManager : MonoBehaviour
             Debug.LogError($"Error al crear usuario por defecto: {e.Message}");
         }
     }
+
     
     // Actualizar UI según estado de sesión
     private void UpdateUIForLoggedInUser()
@@ -244,17 +202,30 @@ public class AuthManager : MonoBehaviour
         try
         {
             var session = await _supabase.Auth.SignInWithPassword(email, password);
-            
+    
             if (session?.User != null)
             {
                 _isLoggedIn = true;
                 _userID = session.User.Id;
                 _userEmail = session.User.Email ?? "";
-                
-                // Guardar tokens
+        
                 SaveSessionTokens(session);
-                SaveUserToRealm();
+            
+                // Guardar usuario en SQLite y actualizar último login
+                SqliteDatabase.Instance.SaveUser(_userID, _userEmail, false);
+            
+                if (DataManager.Instance != null)
+                {
+                    // Sincronizar datos de usuario
+                    await DataManager.Instance.SyncUserDataAsync(_userID);
                 
+                    // Registrar login en MongoDB
+                    if (MongoDbService.Instance.IsConnected())
+                    {
+                        await MongoDbService.Instance.SaveLoginAsync(_userID, _userEmail);
+                    }
+                }
+        
                 UpdateUIForLoggedInUser();
                 Debug.Log($"AuthManager: Inicio de sesión exitoso para {email}");
                 return true;
@@ -321,19 +292,25 @@ public class AuthManager : MonoBehaviour
             Debug.LogWarning("AuthManager: No está completamente inicializado al validar estado");
             return;
         }
-        
+    
         try
         {
-            if (DataService.Instance != null)
+            var user = SqliteDatabase.Instance.GetUser(_userID);
+            if (user == null)
             {
-                // Verificar que el usuario actual existe en la base de datos
-                DataService.Instance.EnsureUserExists(_userID);
-                Debug.Log($"AuthManager: Estado validado para usuario {_userID}");
+                SqliteDatabase.Instance.SaveUser(_userID, _userEmail, false);
             }
+        
+            Debug.Log($"AuthManager: Estado validado para usuario {_userID}");
         }
         catch (Exception e)
         {
             Debug.LogError($"Error al validar estado actual: {e.Message}");
         }
+    }
+    
+    public static bool IsDefaultUser(string userId)
+    {
+        return userId == DEFAULT_USER_ID;
     }
 }

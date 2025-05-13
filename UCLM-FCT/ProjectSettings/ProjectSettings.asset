@@ -140,7 +140,7 @@ PlayerSettings:
   loadStoreDebugModeEnabled: 0
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
-  bundleVersion: 1.1.0-beta
+  bundleVersion: 1.1.1-beta
   preloadedAssets: []
   metroInputSource: 0
   wsaTransparentSwapchain: 0
@@ -162,7 +162,7 @@ PlayerSettings:
   androidSupportedAspectRatio: 1
   androidMaxAspectRatio: 2.1
   applicationIdentifier:
-    Android: com.UCLMCIFPCuencaN1.UCLM
+    Android: com.UCLMCIFPCuencaN1.Pasitos
     Standalone: com.UCLM-CIFP-Cuenca-N--1.UCLM
   buildNumber:
     Standalone: 0

@@ -7,7 +7,6 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using Supabase;
 using Supabase.Gotrue;
-using Realms;
 using Client = Supabase.Client;
 
 public class RegisterManager : MonoBehaviour
@@ -206,6 +205,22 @@ public class RegisterManager : MonoBehaviour
                     // Actualizar propiedad de tutor en una nueva transacción
                     Debug.Log($"Inicio de sesión exitoso, actualizando como tutor: {isTutor}");
                     UpdateUserAsTutor(userId, isTutor);
+                    
+                    // Registrar fecha de creación en MongoDB
+                    await MongoDbService.Instance.SaveUserDataAsync(
+                        userId, 
+                        email, 
+                        new LocalConfiguration { 
+                            UserID = userId,
+                            Colors = 3, 
+                            AutoNarrator = false 
+                        }, 
+                        new SharedModels.ParentalControl { 
+                            Activated = false, 
+                            Pin = "" 
+                        }
+                    );
+                    
                     return true;
                 }
                 else
@@ -238,22 +253,16 @@ public class RegisterManager : MonoBehaviour
     {
         try
         {
-            // Usar un bloque using para asegurar que Realm se cierre correctamente
-            using (var realm = Realm.GetInstance(new RealmConfiguration { SchemaVersion = 1 }))
+            var user = SqliteDatabase.Instance.GetUser(userId);
+        
+            if (user != null)
             {
-                var user = realm.Find<User>(userId);
-                
-                if (user != null)
-                {
-                    realm.Write(() => {
-                        user.IsTutor = isTutor;
-                        Debug.Log($"Usuario {userId} actualizado como tutor: {isTutor}");
-                    });
-                }
-                else
-                {
-                    Debug.LogError($"No se encontró el usuario con ID: {userId}");
-                }
+                SqliteDatabase.Instance.SaveUser(userId, user.Email, isTutor);
+                Debug.Log($"Usuario {userId} actualizado como tutor: {isTutor}");
+            }
+            else
+            {
+                Debug.LogError($"No se encontró el usuario con ID: {userId}");
             }
         }
         catch (System.Exception e)
