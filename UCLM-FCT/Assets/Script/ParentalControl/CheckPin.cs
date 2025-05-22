@@ -63,17 +63,35 @@ public class CheckPin : MonoBehaviour, IPointerClickHandler
         try
         {
             string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+            int profileId = GetCurrentProfileId();
             string storedHash = "";
             bool pinFound = false;
-        
-            var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
-            if (parentalControl != null && !string.IsNullOrEmpty(parentalControl.Pin))
+            
+            // Primero, intentar obtener el PIN específico del perfil
+            if (profileId > 0)
             {
-                storedHash = parentalControl.Pin;
-                pinFound = true;
-                Debug.Log("PIN encontrado para el usuario actual");
+                var profileParental = SqliteDatabase.Instance.GetParentalControl(userId, profileId);
+                if (profileParental != null && !string.IsNullOrEmpty(profileParental.Pin))
+                {
+                    storedHash = profileParental.Pin;
+                    pinFound = true;
+                    Debug.Log($"PIN encontrado para el perfil {profileId} del usuario {userId}");
+                }
+            }
+            
+            // Si no se encontró PIN para el perfil, buscar para el usuario
+            if (!pinFound)
+            {
+                var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+                if (parentalControl != null && !string.IsNullOrEmpty(parentalControl.Pin))
+                {
+                    storedHash = parentalControl.Pin;
+                    pinFound = true;
+                    Debug.Log("PIN encontrado para el usuario actual");
+                }
             }
         
+            // Si no hay PIN para el usuario actual o su perfil, verificar usuario por defecto como última opción
             if (!pinFound && userId != AuthManager.DEFAULT_USER_ID)
             {
                 var defaultParental = SqliteDatabase.Instance.GetParentalControl(AuthManager.DEFAULT_USER_ID);
@@ -99,6 +117,13 @@ public class CheckPin : MonoBehaviour, IPointerClickHandler
             Debug.LogError("Error al verificar PIN: " + e.Message);
             return false;
         }
+    }
+    
+    private int GetCurrentProfileId()
+    {
+        return ProfileManager.Instance != null && ProfileManager.Instance.IsUsingProfile() 
+            ? ProfileManager.Instance.GetCurrentProfileId() 
+            : 0;
     }
     
     private string GetSHA256Hash(string input)

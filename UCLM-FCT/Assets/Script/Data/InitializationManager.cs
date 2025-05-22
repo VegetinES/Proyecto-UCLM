@@ -11,6 +11,11 @@ public class InitializationManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            
+            // Inicializar el cargador de variables de entorno primero
+            EnvironmentLoader.Initialize();
+            Debug.Log("InitializationManager: EnvironmentLoader inicializado");
+            
             StartCoroutine(InitializeInSequence());
         }
         else

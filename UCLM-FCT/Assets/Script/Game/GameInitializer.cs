@@ -5,6 +5,7 @@ public class GameInitializer : MonoBehaviour
     public BoardManager boardManager;
     public LevelGenerator levelGenerator;
     public UIManager uiManager;
+    public StatisticsManager statisticsManager;
     
     void Awake()
     {
@@ -34,6 +35,24 @@ public class GameInitializer : MonoBehaviour
         
         // Configurar el BoardManager
         boardManager.levelNumber = selectedLevel;
+        
+        // Verificar si existe un StatisticsManager
+        if (statisticsManager == null)
+        {
+            statisticsManager = FindFirstObjectByType<StatisticsManager>();
+            
+            // Si no existe, crear uno
+            if (statisticsManager == null && StatisticsManager.Instance == null)
+            {
+                GameObject statsObj = new GameObject("StatisticsManager");
+                statisticsManager = statsObj.AddComponent<StatisticsManager>();
+                Debug.Log("GameInitializer: StatisticsManager creado");
+            }
+            else if (statisticsManager == null)
+            {
+                statisticsManager = StatisticsManager.Instance;
+            }
+        }
         
         try
         {
@@ -72,15 +91,5 @@ public class GameInitializer : MonoBehaviour
         // Iniciar el nivel
         Debug.Log("GameInitializer: Inicializando tablero");
         boardManager.InitializeBoard();
-    }
-    
-    // Método para el botón de ayuda
-    public void OnHintButtonClick()
-    {
-        Debug.Log("GameInitializer: Botón de ayuda pulsado");
-        if (boardManager != null)
-        {
-            boardManager.ShowHint();
-        }
     }
 }

@@ -226,9 +226,4 @@ public class SoundSlider : MonoBehaviour
     {
         slider.interactable = interactable;
     }
-    
-    public int GetValue()
-    {
-        return valueLoaded ? cachedValue : (int)slider.value;
-    }
 }

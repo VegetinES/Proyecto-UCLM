@@ -26,18 +26,4 @@ public class SharedModels : MonoBehaviour
         public bool AboutConf { get; set; } = true;
         public bool ProfileConf { get; set; } = true;
     }
-
-    public class User
-    {
-        public string UID { get; set; }
-        public string Email { get; set; }
-        public bool IsTutor { get; set; }
-    }
-
-    public class Statistics
-    {
-        public int Level { get; set; }
-        public bool Completed { get; set; }
-        public int TimeSpent { get; set; }
-    }
 }

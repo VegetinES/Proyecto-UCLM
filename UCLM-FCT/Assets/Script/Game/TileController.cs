@@ -41,7 +41,7 @@ public class TileController : MonoBehaviour, IPointerClickHandler
         }
         
         // Asegurarse de que existe un EventSystem en la escena
-        if (FindObjectOfType<EventSystem>() == null)
+        if (FindFirstObjectByType<EventSystem>() == null)
         {
             GameObject eventSystemObj = new GameObject("EventSystem");
             eventSystemObj.AddComponent<EventSystem>();

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -17,9 +18,25 @@ public class ChangePage : MonoBehaviour, IPointerClickHandler
     [Tooltip("Si es true, intentará primero cargar otra escena. Si es false o hay error, navegará entre páginas de la misma escena")]
     public bool prioritizeSceneNavigation = false;
     
-    public void OnPointerClick(PointerEventData eventData)
+    private async Task PrepareForExit()
+    {
+        // Si hay un StatisticsManager, preparar para salir
+        if (StatisticsManager.Instance != null)
+        {
+            // Esto esperará a que se guarden las estadísticas
+            await StatisticsManager.Instance.PrepareForExit();
+        }
+    }
+    
+    public async void OnPointerClick(PointerEventData eventData)
     {
         Debug.Log("Image clicked");
+        
+        // Si estamos en una escena de juego, preparar para salir
+        if (SceneManager.GetActiveScene().name == "Game")
+        {
+            await PrepareForExit();
+        }
         
         if (prioritizeSceneNavigation && !string.IsNullOrEmpty(targetSceneName))
         {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Driver;
@@ -38,22 +39,31 @@ public class MongoDbService
         try
         {
             Debug.Log("MongoDbService: Iniciando conexión a MongoDB Atlas...");
-            
+        
             // Ejecutar la conexión en un hilo separado
             return await Task.Run(async () => {
-                try {
-                    string atlasConnection = "mongodb+srv://enriquesequihernandez:LGA5jQ8x5WUy6YzQ@uclm.bgm4csu.mongodb.net/?retryWrites=true&w=majority&appName=UCLM";
+                try { 
+                    // Obtener cadena de conexión desde variables de entorno
+                    string atlasConnection = EnvironmentLoader.GetVariable("MONGODB_CONNECTION", "");
+                
+                    if (string.IsNullOrEmpty(atlasConnection))
+                    {
+                        mainThread?.Post(_ => Debug.LogError("MongoDbService: No se pudo cargar la cadena de conexión a MongoDB desde las variables de entorno"), null);
+                        _isConnected = false;
+                        return false;
+                    }
+                
                     _client = new MongoClient(atlasConnection);
                     _database = _client.GetDatabase("game_data");
-                
+            
                     // Intentar una operación de ping para verificar la conexión
                     await _database.RunCommandAsync((Command<BsonDocument>)"{ping:1}");
-                
+            
                     _isConnected = true;
-                    
+                
                     // Loguear en el hilo principal
                     mainThread?.Post(_ => Debug.Log("MongoDbService: Conexión establecida correctamente"), null);
-                    
+                
                     return true;
                 }
                 catch (Exception e) {
@@ -107,10 +117,19 @@ public class MongoDbService
                         lastLogin = DateTime.UtcNow.ToString("o");
                     }
                     
+                    // Obtener el valor de isTutor desde SQLite
+                    bool isTutor = false;
+                    var user = SqliteDatabase.Instance.GetUser(uid);
+                    if (user != null)
+                    {
+                        isTutor = user.IsTutor;
+                    }
+                    
                     var document = new BsonDocument
                     {
                         { "_id", uid },
                         { "email", email },
+                        { "isTutor", isTutor }, // Añadir campo isTutor
                         { "configuration", new BsonDocument
                             {
                                 { "colors", config.Colors },
@@ -206,6 +225,14 @@ public class MongoDbService
             string platform = Application.platform.ToString();
             string version = Application.version;
             
+            // Obtener el valor de isTutor desde SQLite
+            bool isTutor = false;
+            var user = SqliteDatabase.Instance.GetUser(uid);
+            if (user != null)
+            {
+                isTutor = user.IsTutor;
+            }
+            
             // Ejecutar la parte de MongoDB en un hilo separado
             await Task.Run(async () => {
                 try {
@@ -217,8 +244,10 @@ public class MongoDbService
                     
                     if (existingDoc != null)
                     {
-                        // Actualizar solo la fecha de último login
-                        var update = Builders<BsonDocument>.Update.Set("lastLogin", DateTime.UtcNow.ToString("o"));
+                        // Actualizar la fecha de último login y asegurar que isTutor está actualizado
+                        var update = Builders<BsonDocument>.Update
+                            .Set("lastLogin", DateTime.UtcNow.ToString("o"))
+                            .Set("isTutor", isTutor);
                         await collection.UpdateOneAsync(filter, update);
                     }
                     else
@@ -228,6 +257,7 @@ public class MongoDbService
                         {
                             { "_id", uid },
                             { "email", email },
+                            { "isTutor", isTutor }, // Incluir campo isTutor
                             { "createdAt", DateTime.UtcNow.ToString("o") },
                             { "lastLogin", DateTime.UtcNow.ToString("o") }
                         };
@@ -241,6 +271,7 @@ public class MongoDbService
                     {
                         { "uid", uid },
                         { "email", email },
+                        { "isTutor", isTutor }, // Incluir campo isTutor en logs también
                         { "loginTime", DateTime.UtcNow.ToString("o") },
                         { "platform", platform }, // Usar el valor capturado en el hilo principal
                         { "appVersion", version } // Usar el valor capturado en el hilo principal
@@ -304,5 +335,292 @@ public class MongoDbService
     public bool IsConnected()
     {
         return _isConnected;
+    }
+    
+    public async Task SaveProfileDataAsync(string userId, int profileId, Dictionary<string, object> profileData, Dictionary<string, object> configData = null)
+    {
+        try
+        {
+            if (!_isConnected)
+            {
+                Debug.LogWarning("MongoDbService: SaveProfileDataAsync: No hay conexión establecida");
+                return;
+            }
+            
+            Debug.Log($"MongoDbService: Guardando datos de perfil {profileId} para usuario {userId}");
+            
+            // Ejecutar en un hilo separado
+            await Task.Run(async () => {
+                try {
+                    var collection = _database.GetCollection<BsonDocument>("user_profiles");
+                    var filter = Builders<BsonDocument>.Filter.And(
+                        Builders<BsonDocument>.Filter.Eq("userId", userId),
+                        Builders<BsonDocument>.Filter.Eq("profileId", profileId)
+                    );
+                    
+                    // Crear documento BSON con los datos del perfil
+                    var profileBson = new BsonDocument();
+                    foreach (var kvp in profileData)
+                    {
+                        profileBson.Add(kvp.Key, BsonValue.Create(kvp.Value));
+                    }
+                    
+                    // Añadir datos de configuración si existen
+                    if (configData != null)
+                    {
+                        var configBson = new BsonDocument();
+                        foreach (var kvp in configData)
+                        {
+                            configBson.Add(kvp.Key, BsonValue.Create(kvp.Value));
+                        }
+                        profileBson.Add("config", configBson);
+                    }
+                    
+                    // Añadir información básica
+                    profileBson.Add("userId", userId);
+                    profileBson.Add("lastUpdate", DateTime.UtcNow.ToString("o"));
+                    
+                    // Usar upsert para insertar si no existe o actualizar si existe
+                    await collection.ReplaceOneAsync(filter, profileBson, new ReplaceOptions { IsUpsert = true });
+                    
+                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Datos de perfil guardados correctamente para {userId}/{profileId}"), null);
+                }
+                catch (Exception e) {
+                    mainThread?.Post(_ => Debug.LogError($"MongoDbService: Error al guardar datos de perfil: {e.Message}"), null);
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"MongoDbService: Error general: {e.Message}");
+        }
+    }
+
+    public async Task DeleteProfileDataAsync(string userId, int profileId)
+    {
+        try
+        {
+            if (!_isConnected)
+            {
+                Debug.LogWarning("MongoDbService: DeleteProfileDataAsync: No hay conexión establecida");
+                return;
+            }
+            
+            Debug.Log($"MongoDbService: Eliminando datos de perfil {profileId} para usuario {userId}");
+            
+            // Ejecutar en un hilo separado
+            await Task.Run(async () => {
+                try {
+                    var collection = _database.GetCollection<BsonDocument>("user_profiles");
+                    var filter = Builders<BsonDocument>.Filter.And(
+                        Builders<BsonDocument>.Filter.Eq("userId", userId),
+                        Builders<BsonDocument>.Filter.Eq("profileId", profileId)
+                    );
+                    
+                    var result = await collection.DeleteOneAsync(filter);
+                    
+                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Datos de perfil eliminados: {result.DeletedCount} documentos"), null);
+                }
+                catch (Exception e) {
+                    mainThread?.Post(_ => Debug.LogError($"MongoDbService: Error al eliminar datos de perfil: {e.Message}"), null);
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"MongoDbService: Error general: {e.Message}");
+        }
+    }
+
+    public async Task<List<BsonDocument>> GetProfilesAsync(string userId)
+    {
+        try
+        {
+            if (!_isConnected)
+            {
+                Debug.LogWarning("MongoDbService: GetProfilesAsync: No hay conexión establecida");
+                return new List<BsonDocument>();
+            }
+            
+            Debug.Log($"MongoDbService: Obteniendo perfiles para usuario {userId}");
+            
+            // Ejecutar en un hilo separado
+            return await Task.Run(async () => {
+                try {
+                    var collection = _database.GetCollection<BsonDocument>("user_profiles");
+                    var filter = Builders<BsonDocument>.Filter.Eq("userId", userId);
+                    var result = await collection.Find(filter).ToListAsync();
+                    
+                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Se encontraron {result.Count} perfiles para el usuario {userId}"), null);
+                    
+                    return result;
+                }
+                catch (Exception e) {
+                    mainThread?.Post(_ => Debug.LogError($"MongoDbService: Error al obtener perfiles: {e.Message}"), null);
+                    return new List<BsonDocument>();
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"MongoDbService: Error general: {e.Message}");
+            return new List<BsonDocument>();
+        }
+    }
+    
+    public async Task DeleteUserDataAsync(string userId)
+    {
+        try
+        {
+            if (!_isConnected)
+            {
+                Debug.LogWarning("MongoDbService: DeleteUserDataAsync: No hay conexión establecida");
+                return;
+            }
+            
+            Debug.Log($"MongoDbService: Eliminando datos de usuario {userId}");
+            
+            // Ejecutar en un hilo separado
+            await Task.Run(async () => {
+                try {
+                    // Eliminar al usuario de la colección de usuarios
+                    var usersCollection = _database.GetCollection<BsonDocument>("users");
+                    var userFilter = Builders<BsonDocument>.Filter.Eq("_id", userId);
+                    var userResult = await usersCollection.DeleteOneAsync(userFilter);
+                    
+                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Usuario eliminado de colección users: {userResult.DeletedCount}"), null);
+                    
+                    // Eliminar historial de login
+                    var logsCollection = _database.GetCollection<BsonDocument>("login_logs");
+                    var logsFilter = Builders<BsonDocument>.Filter.Eq("uid", userId);
+                    var logsResult = await logsCollection.DeleteManyAsync(logsFilter);
+                    
+                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Registros de login eliminados: {logsResult.DeletedCount}"), null);
+                    
+                    // Eliminar estadísticas del usuario
+                    var statsCollection = _database.GetCollection<BsonDocument>("statistics");
+                    var statsFilter = Builders<BsonDocument>.Filter.Eq("uid", userId);
+                    var statsResult = await statsCollection.DeleteManyAsync(statsFilter);
+                    
+                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Estadísticas eliminadas: {statsResult.DeletedCount}"), null);
+                    
+                    // Eliminar perfiles de usuario
+                    var profilesCollection = _database.GetCollection<BsonDocument>("user_profiles");
+                    var profilesFilter = Builders<BsonDocument>.Filter.Eq("userId", userId);
+                    var profilesResult = await profilesCollection.DeleteManyAsync(profilesFilter);
+                    
+                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Perfiles eliminados: {profilesResult.DeletedCount}"), null);
+                }
+                catch (Exception e) {
+                    mainThread?.Post(_ => Debug.LogError($"MongoDbService: Error al eliminar datos de usuario: {e.Message}"), null);
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"MongoDbService: Error general: {e.Message}");
+        }
+    }
+    
+    public async Task SaveGameStatisticsAsync(
+        string userId, 
+        int profileId, 
+        int level, 
+        bool completed, 
+        int moves, 
+        int timeSpent, 
+        bool helpUsed, 
+        string timestamp)
+    {
+        try
+        {
+            if (!_isConnected)
+            {
+                Debug.LogWarning("MongoDbService: SaveGameStatisticsAsync: No hay conexión establecida");
+                return;
+            }
+            
+            Debug.Log($"MongoDbService: Guardando estadísticas para usuario {userId}, perfil {profileId}, nivel {level}");
+            
+            // Ejecutar en un hilo separado
+            await Task.Run(async () => {
+                try {
+                    var collection = _database.GetCollection<BsonDocument>("statistics");
+                    var document = new BsonDocument
+                    {
+                        { "userId", userId },
+                        { "profileId", profileId },
+                        { "level", level },
+                        { "completed", completed },
+                        { "moves", moves },
+                        { "timeSpent", timeSpent },
+                        { "helpUsed", helpUsed },
+                        { "timestamp", timestamp }
+                    };
+                    
+                    await collection.InsertOneAsync(document);
+                    
+                    mainThread?.Post(_ => Debug.Log("MongoDbService: Estadísticas de juego guardadas correctamente"), null);
+                }
+                catch (Exception e) {
+                    mainThread?.Post(_ => Debug.LogError($"MongoDbService: Error al guardar estadísticas de juego: {e.Message}"), null);
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"MongoDbService: Error general: {e.Message}");
+        }
+    }
+
+    public async Task<List<BsonDocument>> GetGameStatisticsAsync(string userId, int profileId = 0)
+    {
+        try
+        {
+            if (!_isConnected)
+            {
+                Debug.LogWarning("MongoDbService: GetGameStatisticsAsync: No hay conexión establecida");
+                return new List<BsonDocument>();
+            }
+            
+            Debug.Log($"MongoDbService: Obteniendo estadísticas para usuario {userId}, perfil {profileId}");
+            
+            // Ejecutar en un hilo separado
+            return await Task.Run(async () => {
+                try {
+                    var collection = _database.GetCollection<BsonDocument>("statistics");
+                    
+                    // Filtro base por usuario
+                    var filter = Builders<BsonDocument>.Filter.Eq("userId", userId);
+                    
+                    // Si se especifica un perfil, añadir al filtro
+                    if (profileId > 0)
+                    {
+                        filter = Builders<BsonDocument>.Filter.And(
+                            filter,
+                            Builders<BsonDocument>.Filter.Eq("profileId", profileId)
+                        );
+                    }
+                    
+                    // Ordenar por timestamp descendente (más recientes primero)
+                    var sort = Builders<BsonDocument>.Sort.Descending("timestamp");
+                    
+                    var result = await collection.Find(filter).Sort(sort).ToListAsync();
+                    
+                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Se encontraron {result.Count} estadísticas"), null);
+                    
+                    return result;
+                }
+                catch (Exception e) {
+                    mainThread?.Post(_ => Debug.LogError($"MongoDbService: Error al obtener estadísticas: {e.Message}"), null);
+                    return new List<BsonDocument>();
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"MongoDbService: Error general: {e.Message}");
+            return new List<BsonDocument>();
+        }
     }
 }

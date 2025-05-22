@@ -324,12 +324,6 @@ public class ColorAdapter : MonoBehaviour
         return (int)(c1 + (c2 - c1) * factor);
     }
     
-    public void SetBaseColor(Color color)
-    {
-        baseColor = color;
-        ApplyColorWithIntensity(currentIntensity);
-    }
-    
     // Para usos de editor y debug
     public Color GetBaseColor()
     {
@@ -339,16 +333,6 @@ public class ColorAdapter : MonoBehaviour
     public int GetCurrentIntensity()
     {
         return currentIntensity;
-    }
-    
-    public bool IsChangingAlpha()
-    {
-        return changeAlphaInsteadOfColor;
-    }
-    
-    public float GetMinAlphaPercent()
-    {
-        return minAlphaPercent;
     }
     
     private void DebugLog(string message)

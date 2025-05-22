@@ -7,6 +7,7 @@ public enum ParentalSection
     Sound,
     Accessibility,
     Statistics,
+    Parental,
     About,
     Profile
 }
@@ -53,71 +54,98 @@ public class CheckParentalControl : MonoBehaviour, IPointerClickHandler
         }
     }
     
-    // Reemplazar método IsParentalControlActive completo:
-private bool IsParentalControlActive()
-{
-    try
+    private bool IsParentalControlActive()
     {
-        string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
-        bool isActive = false;
-        
-        var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
-        
-        if (parentalControl != null && parentalControl.Activated && !string.IsNullOrEmpty(parentalControl.Pin))
+        try
         {
-            switch (section)
+            string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+            int profileId = GetCurrentProfileId();
+            bool isActive = false;
+            
+            // Primero, intentar obtener configuración específica del perfil
+            LocalParentalControl parentalControl = null;
+            
+            if (profileId > 0)
             {
-                case ParentalSection.Sound:
-                    isActive = parentalControl.SoundConf;
-                    break;
-                case ParentalSection.Accessibility:
-                    isActive = parentalControl.AccessibilityConf;
-                    break;
-                case ParentalSection.Statistics:
-                    isActive = parentalControl.StatisticsConf;
-                    break;
-                case ParentalSection.About:
-                    isActive = parentalControl.AboutConf;
-                    break;
-                case ParentalSection.Profile:
-                    isActive = parentalControl.ProfileConf;
-                    break;
+                parentalControl = SqliteDatabase.Instance.GetParentalControl(userId, profileId);
             }
-        }
-        else if (userId != AuthManager.DEFAULT_USER_ID)
-        {
-            var defaultParental = SqliteDatabase.Instance.GetParentalControl(AuthManager.DEFAULT_USER_ID);
-            if (defaultParental != null && defaultParental.Activated && !string.IsNullOrEmpty(defaultParental.Pin))
+            
+            // Si no hay configuración específica para el perfil, usar la configuración del usuario
+            if (parentalControl == null)
+            {
+                parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+            }
+            
+            if (parentalControl != null && parentalControl.Activated && !string.IsNullOrEmpty(parentalControl.Pin))
             {
                 switch (section)
                 {
                     case ParentalSection.Sound:
-                        isActive = defaultParental.SoundConf;
+                        isActive = parentalControl.SoundConf;
                         break;
                     case ParentalSection.Accessibility:
-                        isActive = defaultParental.AccessibilityConf;
+                        isActive = parentalControl.AccessibilityConf;
                         break;
                     case ParentalSection.Statistics:
-                        isActive = defaultParental.StatisticsConf;
+                        isActive = parentalControl.StatisticsConf;
+                        break;
+                    case ParentalSection.Parental:
+                        isActive = parentalControl.Activated;
                         break;
                     case ParentalSection.About:
-                        isActive = defaultParental.AboutConf;
+                        isActive = parentalControl.AboutConf;
                         break;
                     case ParentalSection.Profile:
-                        isActive = defaultParental.ProfileConf;
+                        isActive = parentalControl.ProfileConf;
                         break;
                 }
             }
+            else if (userId != AuthManager.DEFAULT_USER_ID)
+            {
+                // Si estamos con una cuenta de usuario pero sin configuración de control parental,
+                // verificar si hay configuración en el usuario por defecto como última opción
+                var defaultParental = SqliteDatabase.Instance.GetParentalControl(AuthManager.DEFAULT_USER_ID);
+                if (defaultParental != null && defaultParental.Activated && !string.IsNullOrEmpty(defaultParental.Pin))
+                {
+                    switch (section)
+                    {
+                        case ParentalSection.Sound:
+                            isActive = defaultParental.SoundConf;
+                            break;
+                        case ParentalSection.Accessibility:
+                            isActive = defaultParental.AccessibilityConf;
+                            break;
+                        case ParentalSection.Statistics:
+                            isActive = defaultParental.StatisticsConf;
+                            break;
+                        case ParentalSection.Parental:
+                            isActive = defaultParental.Activated;
+                            break;
+                        case ParentalSection.About:
+                            isActive = defaultParental.AboutConf;
+                            break;
+                        case ParentalSection.Profile:
+                            isActive = defaultParental.ProfileConf;
+                            break;
+                    }
+                }
+            }
+            
+            return isActive;
         }
-        
-        return isActive;
+        catch (System.Exception e)
+        {
+            Debug.LogError("Error al verificar control parental: " + e.Message);
+            return false;
+        }
     }
-    catch (System.Exception e)
+    
+    private int GetCurrentProfileId()
     {
-        Debug.LogError("Error al verificar control parental: " + e.Message);
-        return false;
+        return ProfileManager.Instance != null && ProfileManager.Instance.IsUsingProfile() 
+            ? ProfileManager.Instance.GetCurrentProfileId() 
+            : 0;
     }
-}
     
     public void Navigate()
     {

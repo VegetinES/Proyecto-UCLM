@@ -50,6 +50,8 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -99,4 +101,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 5
   characterSprites:
+  - {fileID: 1974839562433297958, guid: eb4dfd6d765af9d4bbd19bbee54add22, type: 3}
+  - {fileID: -7229538078365299449, guid: b59257a93757e3f42bb41c19ac48558c, type: 3}
+  - {fileID: -7688753221839614645, guid: ff16817fa21816749b51aa9a02458f5e, type: 3}
   - {fileID: 21300000, guid: 9bbf6d5735c998a498fb372259f391ba, type: 3}
+  - {fileID: -2935663378920149161, guid: dd3a9b7bc6d50a1439bf30c5183fe2f1, type: 3}
+  - {fileID: 2943852199923429518, guid: dee2898e2570ba9489a5159a2fa60baa, type: 3}

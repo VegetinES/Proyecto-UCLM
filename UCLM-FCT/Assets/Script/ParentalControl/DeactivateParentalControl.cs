@@ -64,21 +64,37 @@ public class DeactivateParentalControl : MonoBehaviour, IPointerClickHandler
     {
         try
         {
-            // Obtener ID del usuario actual
+            // Obtener ID del usuario actual y perfil si existe
             string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
+            int profileId = GetCurrentProfileId();
             string storedHash = "";
             bool pinFound = false;
-        
-            // Obtener el hash del PIN desde SQLite
-            var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
-            if (parentalControl != null && !string.IsNullOrEmpty(parentalControl.Pin))
+            
+            // Primero, intentar obtener PIN específico del perfil
+            if (profileId > 0)
             {
-                storedHash = parentalControl.Pin;
-                pinFound = true;
-                Debug.Log("PIN encontrado para el usuario actual");
+                var profileParental = SqliteDatabase.Instance.GetParentalControl(userId, profileId);
+                if (profileParental != null && !string.IsNullOrEmpty(profileParental.Pin))
+                {
+                    storedHash = profileParental.Pin;
+                    pinFound = true;
+                    Debug.Log($"PIN encontrado para el perfil {profileId} del usuario {userId}");
+                }
+            }
+            
+            // Si no se encontró PIN para el perfil, buscar para el usuario
+            if (!pinFound)
+            {
+                var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+                if (parentalControl != null && !string.IsNullOrEmpty(parentalControl.Pin))
+                {
+                    storedHash = parentalControl.Pin;
+                    pinFound = true;
+                    Debug.Log("PIN encontrado para el usuario actual");
+                }
             }
         
-            // Si no encontramos un PIN para el usuario actual, intentamos con el usuario por defecto
+            // Si no hay PIN para el usuario actual o su perfil, verificar usuario por defecto como última opción
             if (!pinFound && userId != AuthManager.DEFAULT_USER_ID)
             {
                 var defaultParentalControl = SqliteDatabase.Instance.GetParentalControl(AuthManager.DEFAULT_USER_ID);
@@ -114,23 +130,36 @@ public class DeactivateParentalControl : MonoBehaviour, IPointerClickHandler
         try
         {
             string userId = DataManager.Instance?.GetCurrentUserId() ?? AuthManager.DEFAULT_USER_ID;
-        
-            var parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+            int profileId = GetCurrentProfileId();
+            
+            // Obtener la configuración actual para el perfil o usuario
+            LocalParentalControl parentalControl = null;
+            
+            if (profileId > 0)
+            {
+                parentalControl = SqliteDatabase.Instance.GetParentalControl(userId, profileId);
+            }
+            
+            if (parentalControl == null)
+            {
+                parentalControl = SqliteDatabase.Instance.GetParentalControl(userId);
+            }
         
             if (parentalControl != null)
             {
                 SqliteDatabase.Instance.SaveParentalControl(
                     userId,
-                    false,
-                    parentalControl.Pin,
+                    false,  // Desactivado
+                    parentalControl.Pin,  // Mantener el mismo PIN
                     parentalControl.SoundConf,
                     parentalControl.AccessibilityConf,
                     parentalControl.StatisticsConf,
                     parentalControl.AboutConf,
-                    parentalControl.ProfileConf
+                    parentalControl.ProfileConf,
+                    profileId
                 );
             
-                Debug.Log("Control parental desactivado correctamente");
+                Debug.Log($"Control parental desactivado correctamente para usuario {userId}" + (profileId > 0 ? $", perfil {profileId}" : ""));
             }
             else
             {
@@ -141,6 +170,13 @@ public class DeactivateParentalControl : MonoBehaviour, IPointerClickHandler
         {
             Debug.LogError("Error al desactivar el control parental: " + e.Message);
         }
+    }
+    
+    private int GetCurrentProfileId()
+    {
+        return ProfileManager.Instance != null && ProfileManager.Instance.IsUsingProfile() 
+            ? ProfileManager.Instance.GetCurrentProfileId() 
+            : 0;
     }
     
     private string GetSHA256Hash(string input)

@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 272263720995736205}
   - component: {fileID: 1722600903298874694}
+  - component: {fileID: 7426575983415833287}
   m_Layer: 0
   m_Name: Home
   m_TagString: Untagged
@@ -49,6 +50,8 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -84,3 +87,22 @@ SpriteRenderer:
   m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!114 &7426575983415833287
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 206704447424952543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 160f92aab46306a46ad3f1da12ada1f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  homeSprites:
+  - {fileID: 2821684471602398614, guid: 7e99ad2d4522e454ca4cefa7fd9506f3, type: 3}
+  - {fileID: 7393687353553119438, guid: 572f277b00e606148b93ffbe71822dd9, type: 3}
+  - {fileID: 7393687353553119438, guid: 572f277b00e606148b93ffbe71822dd9, type: 3}
+  - {fileID: 7393687353553119438, guid: 572f277b00e606148b93ffbe71822dd9, type: 3}
+  - {fileID: 2821684471602398614, guid: 7e99ad2d4522e454ca4cefa7fd9506f3, type: 3}
+  - {fileID: 7393687353553119438, guid: 572f277b00e606148b93ffbe71822dd9, type: 3}

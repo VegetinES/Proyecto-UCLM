@@ -28,7 +28,7 @@ public class ColorAdapterInitializer : MonoBehaviour
         EnsureGlobalColorManager();
         
         // Inicializar todos los adaptadores de color en la escena
-        ColorAdapter[] adapters = FindObjectsOfType<ColorAdapter>();
+        ColorAdapter[] adapters = FindObjectsByType<ColorAdapter>(FindObjectsSortMode.None);
         
         DebugLog($"Inicializando {adapters.Length} adaptadores de color");
         
@@ -50,27 +50,6 @@ public class ColorAdapterInitializer : MonoBehaviour
         {
             DebugLog("GlobalColorManager ya existe");
         }
-    }
-    
-    // Método público para forzar la inicialización desde otro script
-    public void ForceInitialization()
-    {
-        DebugLog("<color=green>Forzando inicialización de adaptadores de color</color>");
-        
-        // Forzar al GlobalColorManager a cargar la intensidad actual
-        if (GlobalColorManager.Instance != null)
-        {
-            GlobalColorManager.Instance.ForceRefresh();
-        }
-        
-        // Forzar una actualización en todos los adaptadores
-        ColorAdapter[] adapters = FindObjectsOfType<ColorAdapter>();
-        foreach (var adapter in adapters)
-        {
-            adapter.ForceRefresh();
-        }
-        
-        DebugLog($"Actualización forzada completada en {adapters.Length} adaptadores");
     }
     
     private void DebugLog(string message)

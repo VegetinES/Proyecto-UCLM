@@ -75,18 +75,4 @@ public class ObstacleManager : MonoBehaviour
     
         Debug.Log($"ObstacleManager: Se han colocado {spawnedObstacles.Count} obstáculos");
     }
-
-    // Mantener el método original para compatibilidad
-    public void SpawnObstacles(Vector2Int[] positions, Transform parent)
-    {
-        // Convertir posiciones de grid a posiciones de mundo
-        Vector3[] worldPositions = new Vector3[positions.Length];
-        for (int i = 0; i < positions.Length; i++)
-        {
-            // Calculo simple - esto debería estar sincronizado con el cálculo en BoardManager
-            worldPositions[i] = new Vector3(positions[i].x, positions[i].y, -0.5f);
-        }
-        
-        SpawnObstaclesAtWorldPositions(worldPositions, parent);
-    }
 }

@@ -175,18 +175,35 @@ public class GlobalColorManager : MonoBehaviour
             DebugLog($"<color=yellow>Actualizando intensidad de color de {currentColorIntensity} a {intensity}</color>");
         
             currentColorIntensity = intensity;
-        
-            var config = SqliteDatabase.Instance.GetConfiguration(userId);
-            if (config != null)
+            
+            int profileId = ProfileManager.Instance?.GetCurrentProfileId() ?? 0;
+            
+            if (profileId > 0)
             {
-                SqliteDatabase.Instance.SaveConfiguration(userId, intensity, config.AutoNarrator, config.Sound, config.GeneralSound, config.MusicSound, config.EffectsSound, config.NarratorSound, config.Vibration);
+                var config = SqliteDatabase.Instance.GetConfiguration(userId, profileId);
+                if (config != null)
+                {
+                    SqliteDatabase.Instance.SaveConfiguration(userId, intensity, config.AutoNarrator, config.Sound, config.GeneralSound, config.MusicSound, config.EffectsSound, config.NarratorSound, config.Vibration, profileId);
+                }
+                else
+                {
+                    SqliteDatabase.Instance.SaveConfiguration(userId, intensity, false, true, 50, 50, 50, 50, false, profileId);
+                }
             }
             else
             {
-                SqliteDatabase.Instance.SaveConfiguration(userId, intensity, false);
+                var config = SqliteDatabase.Instance.GetConfiguration(userId);
+                if (config != null)
+                {
+                    SqliteDatabase.Instance.SaveConfiguration(userId, intensity, config.AutoNarrator, config.Sound, config.GeneralSound, config.MusicSound, config.EffectsSound, config.NarratorSound, config.Vibration);
+                }
+                else
+                {
+                    SqliteDatabase.Instance.SaveConfiguration(userId, intensity, false);
+                }
             }
         
-            DebugLog($"Intensidad de color actualizada a {intensity} para usuario {userId}");
+            DebugLog($"Intensidad de color actualizada a {intensity} para usuario {userId}" + (profileId > 0 ? $", perfil {profileId}" : ""));
             NotifyColorIntensityChanged();
             configLoaded = true;
         }

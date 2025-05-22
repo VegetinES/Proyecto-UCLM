@@ -11,12 +11,23 @@ public class LocalUser
     public string LastLogin { get; set; }
 }
 
+[Table("Profiles")]
+public class LocalProfile
+{
+    [PrimaryKey, AutoIncrement]
+    public int ProfileID { get; set; }
+    public string UserID { get; set; }
+    public string Name { get; set; }
+    public string Gender { get; set; }
+}
+
 [Table("Configurations")]
 public class LocalConfiguration
 {
     [PrimaryKey, AutoIncrement]
     public int ID { get; set; }
     public string UserID { get; set; }
+    public int ProfileID { get; set; } = 0; // 0 significa sin perfil específico
     public int Colors { get; set; } = 3;
     public bool AutoNarrator { get; set; } = false;
     public bool Sound { get; set; } = true;
@@ -33,6 +44,7 @@ public class LocalParentalControl
     [PrimaryKey, AutoIncrement]
     public int ID { get; set; }
     public string UserID { get; set; }
+    public int ProfileID { get; set; } = 0; // 0 significa sin perfil específico
     public bool Activated { get; set; } = false;
     public string Pin { get; set; } = "";
     public bool SoundConf { get; set; } = true;
@@ -40,14 +52,4 @@ public class LocalParentalControl
     public bool StatisticsConf { get; set; } = true;
     public bool AboutConf { get; set; } = true;
     public bool ProfileConf { get; set; } = true;
-}
-
-[Table("Profiles")]
-public class LocalProfile
-{
-    [PrimaryKey, AutoIncrement]
-    public int ProfileID { get; set; }
-    public string UserID { get; set; }
-    public string Name { get; set; }
-    public string Gender { get; set; }
 }

@@ -98,7 +98,9 @@ public class GlobalSoundManager : MonoBehaviour
                 Debug.Log($"GlobalSoundManager: Configuración cargada - Sound: {soundEnabled}, " +
                          $"General: {generalSoundLevel}, Music: {musicSoundLevel}, " +
                          $"Effects: {effectsSoundLevel}, Narrator: {narratorSoundLevel}, " +
-                         $"AutoNarrator: {autoNarrator}, Vibration: {vibrationEnabled}");
+                         $"AutoNarrator: {autoNarrator}, Vibration: {vibrationEnabled}" + 
+                         (ProfileManager.Instance?.IsUsingProfile() ?? false ? 
+                            $" para perfil {ProfileManager.Instance.GetCurrentProfileId()}" : ""));
             }
             else
             {
@@ -120,7 +122,7 @@ public class GlobalSoundManager : MonoBehaviour
     
     private void ApplySoundToggles()
     {
-        var soundToggles = FindObjectsOfType<SoundToggle>();
+        var soundToggles = FindObjectsByType<SoundToggle>(FindObjectsSortMode.None);
         
         foreach (var toggle in soundToggles)
         {
@@ -143,7 +145,7 @@ public class GlobalSoundManager : MonoBehaviour
     
     private void ApplySoundSliders()
     {
-        var soundSliders = FindObjectsOfType<SoundSlider>();
+        var soundSliders = FindObjectsByType<SoundSlider>(FindObjectsSortMode.None);
         
         foreach (var slider in soundSliders)
         {
@@ -169,7 +171,7 @@ public class GlobalSoundManager : MonoBehaviour
     
     private void UpdateSliderInteractability()
     {
-        var soundSliders = FindObjectsOfType<SoundSlider>();
+        var soundSliders = FindObjectsByType<SoundSlider>(FindObjectsSortMode.None);
         
         foreach (var slider in soundSliders)
         {
@@ -259,23 +261,50 @@ public class GlobalSoundManager : MonoBehaviour
             }
     
             var userId = DataManager.Instance.GetCurrentUserId();
+            int profileId = ProfileManager.Instance?.GetCurrentProfileId() ?? 0;
     
-            var currentConfig = SqliteDatabase.Instance.GetConfiguration(userId);
-            int colorsValue = currentConfig != null ? currentConfig.Colors : 3;
-
-            SqliteDatabase.Instance.SaveConfiguration(
-                userId,
-                colorsValue,
-                autoNarrator,
-                soundEnabled,
-                generalSoundLevel,
-                musicSoundLevel,
-                effectsSoundLevel,
-                narratorSoundLevel,
-                vibrationEnabled
-            );
+            if (profileId > 0)
+            {
+                // Actualizar configuración del perfil
+                var currentConfig = SqliteDatabase.Instance.GetConfiguration(userId, profileId);
+                int colorsValue = currentConfig != null ? currentConfig.Colors : 3;
     
-            Debug.Log($"GlobalSoundManager: Configuración guardada para usuario {userId}");
+                SqliteDatabase.Instance.SaveConfiguration(
+                    userId,
+                    colorsValue,
+                    autoNarrator,
+                    soundEnabled,
+                    generalSoundLevel,
+                    musicSoundLevel,
+                    effectsSoundLevel,
+                    narratorSoundLevel,
+                    vibrationEnabled,
+                    profileId
+                );
+    
+                Debug.Log($"GlobalSoundManager: Configuración guardada para usuario {userId}, perfil {profileId}");
+            }
+            else
+            {
+                // Actualizar configuración del usuario
+                var currentConfig = SqliteDatabase.Instance.GetConfiguration(userId);
+                int colorsValue = currentConfig != null ? currentConfig.Colors : 3;
+    
+                SqliteDatabase.Instance.SaveConfiguration(
+                    userId,
+                    colorsValue,
+                    autoNarrator,
+                    soundEnabled,
+                    generalSoundLevel,
+                    musicSoundLevel,
+                    effectsSoundLevel,
+                    narratorSoundLevel,
+                    vibrationEnabled
+                );
+    
+                Debug.Log($"GlobalSoundManager: Configuración guardada para usuario {userId}");
+            }
+            
             PlayerPrefs.Save(); // Asegura que los datos se guarden inmediatamente
             configLoaded = true;
         }
@@ -295,7 +324,7 @@ public class GlobalSoundManager : MonoBehaviour
     public void NotifyVolumeChanges()
     {
         // Buscar todos los controladores de música en la escena y actualizar su volumen
-        GameMusicController[] musicControllers = FindObjectsOfType<GameMusicController>();
+        GameMusicController[] musicControllers = FindObjectsByType<GameMusicController>(FindObjectsSortMode.None);
         foreach (var controller in musicControllers)
         {
             controller.UpdateVolume();

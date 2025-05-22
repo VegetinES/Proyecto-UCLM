@@ -52,7 +52,7 @@ public class LogoutManager : MonoBehaviour
             Debug.Log("Sesión cerrada correctamente");
             
             // Actualizar la UI si hay un SessionUIManager disponible
-            SessionUIManager sessionUI = FindObjectOfType<SessionUIManager>();
+            SessionUIManager sessionUI = FindFirstObjectByType<SessionUIManager>();
             if (sessionUI != null)
             {
                 sessionUI.UpdateUI();

@@ -56,13 +56,15 @@ public class SqliteDatabase
         }
     }
     
-    public void SaveConfiguration(string uid, int colors, bool autoNarrator, bool sound = true, int generalSound = 50, int musicSound = 50, int effectsSound = 50, int narratorSound = 50, bool vibration = false)
+    public void SaveConfiguration(string userId, int colors, bool autoNarrator, bool sound = true, int generalSound = 50, int musicSound = 50, int effectsSound = 50, int narratorSound = 50, bool vibration = false, int profileId = 0)
     {
-        var config = _db.Table<LocalConfiguration>().FirstOrDefault(c => c.UserID == uid);
+        var config = _db.Table<LocalConfiguration>().FirstOrDefault(c => c.UserID == userId && c.ProfileID == profileId);
+        
         if (config == null)
         {
             _db.Insert(new LocalConfiguration { 
-                UserID = uid, 
+                UserID = userId, 
+                ProfileID = profileId,
                 Colors = colors, 
                 AutoNarrator = autoNarrator,
                 Sound = sound,
@@ -87,14 +89,16 @@ public class SqliteDatabase
         }
     }
     
-    public void SaveParentalControl(string uid, bool activated, string pin, bool soundConf = true, bool accessibilityConf = true, bool statisticsConf = true, bool aboutConf = true, bool profileConf = true)
+    public void SaveParentalControl(string userId, bool activated, string pin, bool soundConf = true, bool accessibilityConf = true, bool statisticsConf = true, bool aboutConf = true, bool profileConf = true, int profileId = 0)
     {
-        var pc = _db.Table<LocalParentalControl>().FirstOrDefault(p => p.UserID == uid);
+        var pc = _db.Table<LocalParentalControl>().FirstOrDefault(p => p.UserID == userId && p.ProfileID == profileId);
+        
         if (pc == null)
         {
             _db.Insert(new LocalParentalControl 
             { 
-                UserID = uid, 
+                UserID = userId, 
+                ProfileID = profileId,
                 Activated = activated, 
                 Pin = pin,
                 SoundConf = soundConf,
@@ -118,6 +122,73 @@ public class SqliteDatabase
     }
     
     public LocalUser GetUser(string uid) => _db.Table<LocalUser>().FirstOrDefault(u => u.UID == uid);
-    public LocalConfiguration GetConfiguration(string uid) => _db.Table<LocalConfiguration>().FirstOrDefault(c => c.UserID == uid);
-    public LocalParentalControl GetParentalControl(string uid) => _db.Table<LocalParentalControl>().FirstOrDefault(p => p.UserID == uid);
+    public LocalConfiguration GetConfiguration(string userId)
+    {
+        return _db.Table<LocalConfiguration>().FirstOrDefault(c => c.UserID == userId && c.ProfileID == 0);
+    }
+
+    // Nueva sobrecarga que acepta el parámetro profileId
+    public LocalConfiguration GetConfiguration(string userId, int profileId)
+    {
+        return _db.Table<LocalConfiguration>()
+            .FirstOrDefault(c => c.UserID == userId && c.ProfileID == profileId);
+    }
+    public LocalParentalControl GetParentalControl(string userId)
+    {
+        return _db.Table<LocalParentalControl>().FirstOrDefault(p => p.UserID == userId && p.ProfileID == 0);
+    }
+
+    // Nueva sobrecarga que acepta el parámetro profileId
+    public LocalParentalControl GetParentalControl(string userId, int profileId)
+    {
+        return _db.Table<LocalParentalControl>()
+            .FirstOrDefault(p => p.UserID == userId && p.ProfileID == profileId);
+    }
+    
+    public int SaveProfile(string userId, string name, string gender)
+    {
+        var profile = new LocalProfile
+        {
+            UserID = userId,
+            Name = name,
+            Gender = gender
+        };
+    
+        _db.Insert(profile);
+    
+        // Obtener el ID generado
+        var savedProfile = _db.Table<LocalProfile>().Where(p => p.UserID == userId && p.Name == name && p.Gender == gender).OrderByDescending(p => p.ProfileID).FirstOrDefault();
+        
+        return savedProfile?.ProfileID ?? 0;
+    }
+
+    public void DeleteProfile(int profileId)
+    {
+        _db.Delete<LocalProfile>(profileId);
+    
+        // También eliminar configuraciones asociadas a este perfil
+        var configs = _db.Table<LocalConfiguration>().Where(c => c.ProfileID == profileId).ToList();
+        foreach (var config in configs)
+        {
+            _db.Delete<LocalConfiguration>(config.ID);
+        }
+    
+        var parentalControls = _db.Table<LocalParentalControl>().Where(p => p.ProfileID == profileId).ToList();
+        foreach (var pc in parentalControls)
+        {
+            _db.Delete<LocalParentalControl>(pc.ID);
+        }
+    
+        Debug.Log($"Perfil {profileId} y sus configuraciones asociadas eliminados de la base de datos");
+    }
+
+    public List<LocalProfile> GetProfiles(string userId)
+    {
+        return _db.Table<LocalProfile>().Where(p => p.UserID == userId).ToList();
+    }
+    
+    public LocalProfile GetProfileById(int profileId)
+    {
+        return _db.Table<LocalProfile>().FirstOrDefault(p => p.ProfileID == profileId);
+    }
 }
