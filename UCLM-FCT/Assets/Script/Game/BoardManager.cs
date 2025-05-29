@@ -714,20 +714,20 @@ public class BoardManager : MonoBehaviour
     {
         if (gameCompleted) return false;
         if (!IsValidMove(tilePosition)) return false;
-    
+
         CharacterController controller = characterObject.GetComponent<CharacterController>();
         if (controller != null)
         {
             bool moved = controller.TryMove(tilePosition);
-            
+        
             if (moved && statistics != null)
             {
                 statistics.RegisterMove();
             }
-            
+        
             return moved;
         }
-    
+
         return false;
     }
 
@@ -738,20 +738,20 @@ public class BoardManager : MonoBehaviour
         {
             return false;
         }
-    
+
         if (tiles[tilePosition.x, tilePosition.y] == null)
         {
             return false;
         }
-    
+
         if (obstaclePositions.Contains(tilePosition))
         {
             return false;
         }
-    
+
         int distX = Mathf.Abs(tilePosition.x - characterPosition.x);
         int distY = Mathf.Abs(tilePosition.y - characterPosition.y);
-    
+
         return (distX == 1 && distY == 0) || (distX == 0 && distY == 1);
     }
     
@@ -830,5 +830,59 @@ public class BoardManager : MonoBehaviour
         float offsetX = (boardWidth - 1) * 0.5f;
         float offsetY = (boardHeight - 1) * 0.5f;
         return new Vector3(gridPosition.x - offsetX, gridPosition.y - offsetY, 0);
+    }
+    
+    public Vector2Int GetCharacterCurrentPosition()
+    {
+        return characterPosition;
+    }
+
+    public Vector2Int WorldToGridPosition(Vector3 worldPos)
+    {
+        float offsetX = (boardWidth - 1) * 0.5f;
+        float offsetY = (boardHeight - 1) * 0.5f;
+    
+        int gridX = Mathf.RoundToInt(worldPos.x + offsetX);
+        int gridY = Mathf.RoundToInt(worldPos.y + offsetY);
+    
+        return new Vector2Int(gridX, gridY);
+    }
+
+    public bool IsPositionOnBoard(Vector2Int gridPos)
+    {
+        return gridPos.x >= 0 && gridPos.x < boardWidth && 
+               gridPos.y >= 0 && gridPos.y < boardHeight &&
+               tiles[gridPos.x, gridPos.y] != null;
+    }
+
+    public bool IsValidMovePosition(Vector2Int gridPos)
+    {
+        if (!IsPositionOnBoard(gridPos)) return false;
+        if (obstaclePositions.Contains(gridPos)) return false;
+        return true;
+    }
+
+    public bool MoveCharacterToPosition(Vector2Int targetPos)
+    {
+        if (gameCompleted) return false;
+        if (!IsValidMovePosition(targetPos)) return false;
+    
+        CharacterController controller = characterObject.GetComponent<CharacterController>();
+        if (controller != null)
+        {
+            bool moved = controller.TryMove(targetPos);
+            if (moved && statistics != null)
+            {
+                statistics.RegisterMove();
+            }
+            return moved;
+        }
+    
+        return false;
+    }
+    
+    public bool IsGameCompleted()
+    {
+        return gameCompleted;
     }
 }
