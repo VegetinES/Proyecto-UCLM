@@ -25,7 +25,6 @@ public static class EnvironmentLoader
             return value;
         }
 
-        // También intentamos obtener desde las variables de entorno del sistema
         string envValue = Environment.GetEnvironmentVariable(key);
         if (!string.IsNullOrEmpty(envValue))
         {
@@ -37,8 +36,7 @@ public static class EnvironmentLoader
 
     private static void LoadEnvFile()
     {
-        // Ruta al archivo .env en la raíz del proyecto
-        string envPath = Path.Combine(Application.dataPath, "..", ".env");
+        string envPath = GetEnvFilePath();
 
         try
         {
@@ -50,18 +48,15 @@ public static class EnvironmentLoader
                 {
                     string trimmedLine = line.Trim();
                     
-                    // Ignorar líneas vacías o comentarios
                     if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith("#"))
                         continue;
 
-                    // Separar clave y valor
                     int separatorIndex = trimmedLine.IndexOf('=');
                     if (separatorIndex > 0)
                     {
                         string key = trimmedLine.Substring(0, separatorIndex).Trim();
                         string value = trimmedLine.Substring(separatorIndex + 1).Trim();
 
-                        // Remover comillas si existen
                         if (value.StartsWith("\"") && value.EndsWith("\""))
                         {
                             value = value.Substring(1, value.Length - 2);
@@ -72,16 +67,46 @@ public static class EnvironmentLoader
                     }
                 }
                 
-                Debug.Log($"EnvironmentLoader: Cargadas {_envVars.Count} variables de entorno");
+                Debug.Log($"EnvironmentLoader: Cargadas {_envVars.Count} variables de entorno desde {envPath}");
             }
             else
             {
-                Debug.LogWarning("EnvironmentLoader: No se encontró el archivo .env");
+                Debug.LogWarning($"EnvironmentLoader: No se encontró el archivo .env en {envPath}");
             }
         }
         catch (Exception e)
         {
             Debug.LogError($"EnvironmentLoader: Error al cargar .env: {e.Message}");
         }
+    }
+
+    private static string GetEnvFilePath()
+    {
+        // Buscar en StreamingAssets (para builds y editor)
+        string streamingAssetsPath = Path.Combine(Application.streamingAssetsPath, ".env");
+        if (File.Exists(streamingAssetsPath))
+        {
+            return streamingAssetsPath;
+        }
+
+        // Buscar en la raíz del proyecto (solo para editor)
+        if (Application.isEditor)
+        {
+            string projectRootPath = Path.Combine(Application.dataPath, "..", ".env");
+            if (File.Exists(projectRootPath))
+            {
+                return projectRootPath;
+            }
+        }
+
+        // Buscar en persistentDataPath (para casos especiales)
+        string persistentPath = Path.Combine(Application.persistentDataPath, ".env");
+        if (File.Exists(persistentPath))
+        {
+            return persistentPath;
+        }
+
+        // Devolver la ruta de StreamingAssets como predeterminada
+        return streamingAssetsPath;
     }
 }

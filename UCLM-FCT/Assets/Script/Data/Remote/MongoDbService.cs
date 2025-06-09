@@ -292,46 +292,6 @@ public class MongoDbService
         }
     }
     
-    public async Task SaveStatisticsAsync(string uid, int level, bool completed, int timeSpent)
-    {
-        try
-        {
-            if (!_isConnected)
-            {
-                Debug.LogWarning("MongoDbService: SaveStatisticsAsync: No hay conexión establecida");
-                return;
-            }
-            
-            Debug.Log($"MongoDbService: Guardando estadísticas para usuario {uid}, nivel {level}");
-            
-            // Ejecutar en un hilo separado
-            await Task.Run(async () => {
-                try {
-                    var collection = _database.GetCollection<BsonDocument>("statistics");
-                    var document = new BsonDocument
-                    {
-                        { "uid", uid },
-                        { "level", level },
-                        { "completed", completed },
-                        { "timeSpent", timeSpent },
-                        { "timestamp", DateTime.UtcNow.ToString("o") }
-                    };
-                    
-                    await collection.InsertOneAsync(document);
-                    
-                    mainThread?.Post(_ => Debug.Log("MongoDbService: Estadísticas guardadas correctamente"), null);
-                }
-                catch (Exception e) {
-                    mainThread?.Post(_ => Debug.LogError($"MongoDbService: Error al guardar estadísticas: {e.Message}"), null);
-                }
-            });
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"MongoDbService: Error general: {e.Message}");
-        }
-    }
-    
     public bool IsConnected()
     {
         return _isConnected;
@@ -429,42 +389,6 @@ public class MongoDbService
         catch (Exception e)
         {
             Debug.LogError($"MongoDbService: Error general: {e.Message}");
-        }
-    }
-
-    public async Task<List<BsonDocument>> GetProfilesAsync(string userId)
-    {
-        try
-        {
-            if (!_isConnected)
-            {
-                Debug.LogWarning("MongoDbService: GetProfilesAsync: No hay conexión establecida");
-                return new List<BsonDocument>();
-            }
-            
-            Debug.Log($"MongoDbService: Obteniendo perfiles para usuario {userId}");
-            
-            // Ejecutar en un hilo separado
-            return await Task.Run(async () => {
-                try {
-                    var collection = _database.GetCollection<BsonDocument>("user_profiles");
-                    var filter = Builders<BsonDocument>.Filter.Eq("userId", userId);
-                    var result = await collection.Find(filter).ToListAsync();
-                    
-                    mainThread?.Post(_ => Debug.Log($"MongoDbService: Se encontraron {result.Count} perfiles para el usuario {userId}"), null);
-                    
-                    return result;
-                }
-                catch (Exception e) {
-                    mainThread?.Post(_ => Debug.LogError($"MongoDbService: Error al obtener perfiles: {e.Message}"), null);
-                    return new List<BsonDocument>();
-                }
-            });
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"MongoDbService: Error general: {e.Message}");
-            return new List<BsonDocument>();
         }
     }
     

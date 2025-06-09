@@ -4,44 +4,35 @@ using UnityEngine.SceneManagement;
 
 public class SessionUIManager : MonoBehaviour
 {
-    // GameObjects para diferentes estados de inicio de sesión
-    public GameObject TutorLoggedIn;      // Para tutores con sesión iniciada
-    public GameObject ProfileLoggedIn;     // Para perfiles con sesión iniciada
-    public GameObject UserLoggedIn;        // Para usuarios normales con sesión iniciada
-    public GameObject NotLoggedIn;         // Para cuando no hay sesión iniciada
+    public GameObject TutorLoggedIn;
+    public GameObject ProfileLoggedIn;
+    public GameObject UserLoggedIn;
+    public GameObject NotLoggedIn;
     
-    [SerializeField] private float maxWaitTime = 10.0f; // Aumentar tiempo de espera
+    [SerializeField] private float maxWaitTime = 10.0f;
+    [SerializeField] private float monitorInterval = 0.1f;
+    
+    private bool isMonitoring = false;
+    private bool lastTutorState = false;
     
     private void Start()
     {
-        // Estado por defecto - Sin sesión
         SetAllInactive();
         if (NotLoggedIn != null) NotLoggedIn.SetActive(true);
         
-        // Esperar a que AuthManager esté inicializado
         StartCoroutine(CheckAuthState());
     }
     
     private IEnumerator CheckAuthState()
     {
-        Debug.Log("SessionUIManager: Esperando a que AuthManager esté disponible...");
-        
-        // Esperar a que AuthManager esté disponible
         float elapsed = 0f;
         
         while (elapsed < maxWaitTime)
         {
             if (AuthManager.Instance != null && AuthManager.Instance.IsInitialized())
             {
-                Debug.Log("SessionUIManager: AuthManager encontrado y inicializado");
-                
-                // Validar el estado actual
                 AuthManager.Instance.ValidateCurrentState();
-                
-                // Actualizar UI según estado de sesión
                 UpdateUI();
-                
-                Debug.Log("SessionUIManager: UI actualizada correctamente");
                 yield break;
             }
             
@@ -50,9 +41,6 @@ public class SessionUIManager : MonoBehaviour
         }
         
         Debug.LogError("AuthManager no disponible después del tiempo de espera");
-            
-        // Modo sin sesión por defecto (ya establecido en Start)
-        Debug.Log("SessionUIManager: Usando modo sin sesión por defecto");
     }
     
     public void UpdateUI()
@@ -61,47 +49,69 @@ public class SessionUIManager : MonoBehaviour
     
         if (!isLoggedIn)
         {
-            // Si no hay sesión iniciada
             SetAllInactive();
             if (NotLoggedIn != null) NotLoggedIn.SetActive(true);
-            Debug.Log("Estado de sesión: Sin sesión");
             return;
         }
         
-        // Hay sesión iniciada, determinar el tipo de usuario
         string userId = AuthManager.Instance.UserID;
         var user = SqliteDatabase.Instance.GetUser(userId);
         
         if (user != null && user.IsTutor)
         {
-            // Es un tutor
             SetAllInactive();
-            if (TutorLoggedIn != null) TutorLoggedIn.SetActive(true);
-            Debug.Log("Estado de sesión: Tutor con sesión");
+            if (TutorLoggedIn != null) 
+            {
+                TutorLoggedIn.SetActive(true);
+                StartMonitoring();
+            }
         }
         else if (ProfileManager.Instance != null && ProfileManager.Instance.IsUsingProfile())
         {
-            // Es un perfil
             SetAllInactive();
             if (ProfileLoggedIn != null) ProfileLoggedIn.SetActive(true);
-            Debug.Log("Estado de sesión: Perfil con sesión");
         }
         else
         {
-            // Es un usuario normal
             SetAllInactive();
             if (UserLoggedIn != null) UserLoggedIn.SetActive(true);
-            Debug.Log("Estado de sesión: Usuario con sesión");
-        }
-    
-        // Asegurar que el DataManager está disponible
-        if (DataManager.Instance != null)
-        {
-            Debug.Log("SessionUIManager: DataManager está disponible");
         }
     }
     
-    // Método auxiliar para desactivar todos los objetos
+    private void StartMonitoring()
+    {
+        if (!isMonitoring && TutorLoggedIn != null)
+        {
+            isMonitoring = true;
+            lastTutorState = TutorLoggedIn.activeSelf;
+            StartCoroutine(MonitorTutorLoggedIn());
+        }
+    }
+    
+    private IEnumerator MonitorTutorLoggedIn()
+    {
+        while (isMonitoring && TutorLoggedIn != null)
+        {
+            bool currentState = TutorLoggedIn.activeSelf;
+            
+            if (currentState != lastTutorState)
+            {
+                if (!currentState)
+                {
+                    TutorLoggedIn.SetActive(true);
+                }
+                lastTutorState = currentState;
+            }
+            
+            yield return new WaitForSeconds(monitorInterval);
+        }
+    }
+    
+    private void StopMonitoring()
+    {
+        isMonitoring = false;
+    }
+    
     private void SetAllInactive()
     {
         if (TutorLoggedIn != null) TutorLoggedIn.SetActive(false);
@@ -113,5 +123,15 @@ public class SessionUIManager : MonoBehaviour
     public void GoToLogin()
     {
         SceneManager.LoadScene("Login");
+    }
+    
+    private void OnDisable()
+    {
+        StopMonitoring();
+    }
+    
+    private void OnDestroy()
+    {
+        StopMonitoring();
     }
 }
